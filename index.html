@@ -1,0 +1,1130 @@
+<!doctype html>
+<html lang="en" data-lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Gabriel Munaro · How I build</title>
+<meta name="description" content="947 pull requests merged in 26 days with a swarm of AI agents. The workflow, three real runs of it, and the measurements behind each rule.">
+<meta property="og:type" content="article">
+<meta property="og:title" content="947 pull requests in 26 days, with a swarm of AI agents">
+<meta property="og:description" content="The workflow, three real runs of it, and the measurements behind each rule. By Gabriel Munaro.">
+<meta property="og:image" content="https://gmunaro.github.io/how-i-build/img/og.png">
+<meta property="og:url" content="https://gmunaro.github.io/how-i-build/">
+<meta name="twitter:card" content="summary_large_image">
+<script>
+(function(){var l,d=document.documentElement;try{l=localStorage.getItem('lang')}catch(e){}
+var q=/[?&]lang=(pt|en)/.exec(location.search);if(q)l=q[1];
+if(l!=='pt'&&l!=='en')l=/^pt/i.test((navigator.languages&&navigator.languages[0])||navigator.language||'')?'pt':'en';
+d.dataset.lang=l;d.lang=l==='pt'?'pt-BR':'en'})();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@400;700&display=swap">
+<style>
+/* Layout: mapa de metrô. Cada modelo é uma linha colorida; a página segue tarefas reais do roteador até o "pronto".
+   Painéis interativos ganham sombra dura na cor da linha ativa. A arte do jogo fica em painéis na cor de fundo das folhas do júri. */
+:root{
+  --bg:#F4F5FB; --surface:#FFFFFF; --soft:#E9EBF7; --fg:#14162B; --muted:#51557A; --rule:#D5D8EA;
+  --h:#C28500; --s:#00A88F; --o:#8E7BFF; --f:#F0456B; --sun:#FFC233; --on-line:#14162B;
+  --h-dk:#BD8A14; --s-dk:#16A389; --o-dk:#9280F0; --f-dk:#EE5578;
+  --band-bg:#14162B; --band-fg:#F1F2FF; --band-muted:#A9ADD0; --band-surface:#1F2140; --band-soft:#262950; --band-rule:#3A3D68;
+  --art:#1E1C22; --art-fg:#EDEBF2; --art-muted:#A5A0B4; --art-rule:#3A3644;
+  --display:"Bricolage Grotesque","Arial Narrow","Helvetica Neue",Arial,sans-serif;
+  --body:"Atkinson Hyperlegible",Verdana,"Segoe UI",system-ui,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,"Cascadia Mono",Consolas,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0E0F1F; --surface:#191B33; --soft:#20223F; --fg:#EEF0FF; --muted:#A4A8CC; --rule:#2E3158;
+    --h:#BD8A14; --s:#16A389; --o:#9280F0; --f:#EE5578; --sun:#FFC233; --on-line:#14162B;
+    --band-bg:#191B33; --band-fg:#F1F2FF; --band-muted:#A9ADD0; --band-surface:#22254A; --band-soft:#2A2D55; --band-rule:#3F4374;
+    --art:#1E1C22; --art-fg:#EDEBF2; --art-muted:#A5A0B4; --art-rule:#3A3644;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0E0F1F; --surface:#191B33; --soft:#20223F; --fg:#EEF0FF; --muted:#A4A8CC; --rule:#2E3158;
+  --h:#BD8A14; --s:#16A389; --o:#9280F0; --f:#EE5578; --sun:#FFC233; --on-line:#14162B;
+  --band-bg:#191B33; --band-fg:#F1F2FF; --band-muted:#A9ADD0; --band-surface:#22254A; --band-soft:#2A2D55; --band-rule:#3F4374;
+  --art:#1E1C22; --art-fg:#EDEBF2; --art-muted:#A5A0B4; --art-rule:#3A3644;
+  color-scheme:dark;
+}
+html[data-lang="en"] [lang="pt"],html[data-lang="pt"] [lang="en"]{display:none!important}
+
+*,*::before,*::after{box-sizing:border-box}
+[hidden]{display:none!important}
+html{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--body);font-size:1.0625rem;line-height:1.6;-webkit-text-size-adjust:100%}
+h1,h2,h3,p,ul,ol,dl,dd,figure{margin:0}
+ul,ol{padding:0;list-style:none}
+img{max-width:100%;height:auto;display:block}
+a{color:inherit;text-decoration-thickness:2px;text-underline-offset:3px}
+button{font:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:3px solid var(--fg);outline-offset:3px;border-radius:6px}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;letter-spacing:-.02em}
+code,.mono{font-family:var(--mono);font-size:.9em}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.wrap{max-width:1160px;margin-inline:auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+@media (min-width:720px){.wrap{padding-left:max(32px,env(safe-area-inset-left,0px));padding-right:max(32px,env(safe-area-inset-right,0px))}}
+.skip{position:absolute;left:12px;top:-80px;z-index:30;background:var(--fg);color:var(--bg);padding:12px 16px;border-radius:10px;font-weight:700}
+.skip:focus{top:12px}
+.progress{position:fixed;left:0;right:0;top:env(safe-area-inset-top,0px);height:5px;z-index:20;pointer-events:none}
+.progress i{display:block;height:100%;transform-origin:left;transform:scaleX(var(--p,0));background:linear-gradient(90deg,var(--h) 0 25%,var(--s) 25% 50%,var(--o) 50% 75%,var(--f) 75%)}
+
+/* ---------- topo e hero ---------- */
+.top{display:flex;justify-content:space-between;align-items:center;gap:16px;padding-block:18px 0;padding-right:clamp(92px,17vw,236px)}
+.top b{font-family:var(--display);font-weight:800;font-size:1.1rem;letter-spacing:-.01em}
+.langs{display:flex;border:2px solid var(--fg);border-radius:999px;overflow:hidden;background:var(--surface)}
+.langs button{border:0;background:transparent;min-width:52px;min-height:40px;font-family:var(--mono);font-weight:700;font-size:.85rem}
+.langs button[aria-pressed="true"]{background:var(--fg);color:var(--bg)}
+.hero{position:relative;overflow:clip}
+.ribbon{position:absolute;top:0;right:0;width:clamp(96px,18vw,230px);height:auto;pointer-events:none}
+.ribbon path{fill:none;stroke-width:15}
+.ribbon circle{fill:var(--bg);stroke:var(--fg);stroke-width:4}
+.hero-grid{display:grid;gap:36px;padding-block:clamp(48px,7vw,72px) 0;align-items:end}
+@media (min-width:980px){.hero-grid{grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);gap:56px}}
+.hero-grid>*{min-width:0}
+.eyebrow{font-family:var(--mono);font-size:.8rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+h1{font-size:clamp(2.4rem,6.3vw,4.5rem);line-height:.98;font-weight:800;margin-top:16px}
+.hl{background-repeat:no-repeat;background-size:100% .2em;background-position:0 92%;-webkit-box-decoration-break:clone;box-decoration-break:clone}
+.hl-s{background-image:linear-gradient(var(--s),var(--s))}
+.hl-y{background-image:linear-gradient(var(--sun),var(--sun))}
+.lede{font-size:clamp(1.08rem,1.7vw,1.22rem);line-height:1.5;max-width:58ch;margin-top:24px}
+.shot{border-radius:14px;overflow:hidden;border:2px solid var(--fg);box-shadow:9px 9px 0 var(--o);background:var(--art)}
+.shot img{width:100%;image-rendering:pixelated}
+.shot figcaption,.cap{font-size:.88rem;color:var(--muted)}
+.shot figcaption{padding:10px 14px;background:var(--surface);border-top:2px solid var(--fg);color:var(--fg)}
+
+.prs{margin-top:clamp(40px,6vw,64px);padding-top:24px;border-top:2px solid var(--fg)}
+.prs-head{display:flex;flex-wrap:wrap;gap:8px 32px;justify-content:space-between;align-items:baseline}
+.prs-head h2{font-size:1.25rem;margin:0;max-width:none;line-height:1.2}
+.days{display:flex;align-items:flex-end;gap:clamp(2px,.5vw,6px);height:190px;margin-top:38px;border-bottom:2px solid var(--fg)}
+.day{position:relative;flex:1 1 0;height:100%;display:flex;align-items:flex-end;min-width:0}
+.day i{display:block;width:100%;height:calc(var(--v)*100%);min-height:2px;background:var(--s);border-radius:4px 4px 0 0;transform-origin:bottom;animation:grow .8s cubic-bezier(.2,.9,.3,1) both;animation-delay:calc(var(--k)*28ms)}
+.day.zero i{background:var(--rule);min-height:2px}
+.day.peak i{background:var(--fg)}
+.day b{position:absolute;left:50%;bottom:calc(var(--v)*100% + 6px);transform:translateX(-50%);font-family:var(--mono);font-size:.78rem;white-space:nowrap}
+.day u{display:none;position:absolute;left:50%;bottom:calc(var(--v)*100% + 6px);transform:translateX(-50%);text-decoration:none;font-family:var(--mono);font-size:.75rem;white-space:nowrap;background:var(--fg);color:var(--bg);padding:3px 8px;border-radius:6px;z-index:3}
+.day:hover u,.day:focus u{display:block}
+.day:hover b{visibility:hidden}
+.day:hover i{filter:brightness(1.15)}
+@keyframes grow{from{transform:scaleY(.04)}to{transform:none}}
+.axis{position:relative;height:44px;font-family:var(--mono);font-size:.75rem;color:var(--muted)}
+.axis span{position:absolute;top:6px;transform:translateX(-50%);white-space:nowrap}
+.axis span.rel{top:22px;color:var(--fg);font-weight:700}
+.axis span.rel::before{content:"";position:absolute;left:50%;top:-5px;height:5px;border-left:2px solid var(--fg)}
+.axis span.rel::after{content:"";position:absolute;left:50%;top:-22px;height:5px;border-left:2px solid var(--fg)}
+.axis span:first-child{transform:none}.axis span.end{transform:translateX(-100%)}
+.stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:28px 24px;margin-top:20px;padding-bottom:clamp(40px,6vw,72px)}
+@media (min-width:860px){.stats{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.stat b{display:block;font-family:var(--display);font-weight:800;font-size:clamp(2.1rem,4.6vw,3.3rem);line-height:1;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.stat span{display:block;margin-top:8px;font-size:.95rem;line-height:1.4;color:var(--muted);max-width:26ch}
+
+/* ---------- galeria ---------- */
+.art{background:var(--art);color:var(--art-fg)}
+.gallery{display:flex;gap:8px;overflow-x:auto;padding:28px max(16px,env(safe-area-inset-left,0px)) 8px;scrollbar-width:thin;scroll-snap-type:x proximity}
+.gallery figure{flex:none;scroll-snap-align:center;display:grid;justify-items:center;align-content:end;gap:6px;width:clamp(150px,19vw,230px)}
+.gallery img{height:clamp(170px,22vw,250px);width:auto;object-fit:contain;transition:transform .25s}
+.gallery figure:hover img{transform:translateY(-8px) scale(1.04)}
+.gallery figcaption{font-family:var(--mono);font-size:.74rem;color:var(--art-muted);text-align:center}
+.art-note{padding-block:14px 30px;color:var(--art-muted);font-size:.98rem}
+.art-note p{max-width:78ch}
+.art-note b{color:var(--art-fg)}
+
+/* ---------- seções ---------- */
+section{scroll-margin-top:24px}
+.sec{padding-block:clamp(56px,8vw,100px)}
+.sec + .sec:not(.band){border-top:1px solid var(--rule)}
+.band{background:var(--band-bg);--fg:var(--band-fg);--muted:var(--band-muted);--surface:var(--band-surface);--soft:var(--band-soft);--rule:var(--band-rule);--bg:var(--band-bg);--h:var(--h-dk);--s:var(--s-dk);--o:var(--o-dk);--f:var(--f-dk);color:var(--fg)}
+.tag{display:inline-block;font-family:var(--mono);font-size:.8rem;letter-spacing:.04em;color:var(--muted);border:1.5px solid var(--rule);border-radius:999px;padding:4px 12px}
+h2{font-size:clamp(1.9rem,4.4vw,3.1rem);line-height:1.02;font-weight:800;max-width:19ch;margin-top:16px}
+.intro{max-width:62ch;margin-top:20px;font-size:1.1rem}
+.intro + .intro{margin-top:12px}
+h3{font-size:1.25rem;line-height:1.2;font-weight:700}
+.chip{display:inline-flex;align-items:center;font-family:var(--mono);font-size:.76rem;font-weight:700;padding:3px 9px;border-radius:999px;background:var(--lc,var(--soft));color:var(--on-line);white-space:nowrap}
+.chip.c{background:var(--fg);color:var(--bg)}
+.chip.ol{background:transparent;color:var(--fg);border:1.5px solid var(--fg)}
+[data-l="H"]{--lc:var(--h)} [data-l="S"]{--lc:var(--s)} [data-l="O"]{--lc:var(--o)} [data-l="F"]{--lc:var(--f)} [data-l="C"]{--lc:var(--fg)} [data-l="T"]{--lc:var(--s)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:10px 22px;border:2px solid var(--fg);border-radius:999px;background:var(--fg);color:var(--bg);font-weight:700;box-shadow:4px 4px 0 var(--f);transition:transform .12s,box-shadow .12s;text-decoration:none}
+.btn:hover{transform:translate(-2px,-2px);box-shadow:6px 6px 0 var(--f)}
+.btn:active{transform:translate(3px,3px);box-shadow:1px 1px 0 var(--f)}
+.btn[disabled]{opacity:.55;cursor:progress}
+.btn.ghost{background:var(--surface);color:var(--fg);box-shadow:none}
+.btn.ghost:hover{box-shadow:4px 4px 0 var(--rule)}
+.btn.sm{min-height:40px;padding:6px 16px;font-size:.92rem;box-shadow:3px 3px 0 var(--o)}
+
+/* ---------- roteador ---------- */
+.router{display:grid;gap:32px;margin-top:36px;align-items:start}
+@media (min-width:900px){.router{grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);gap:48px}}
+.router-main{display:grid;gap:20px;min-width:0}
+.ticket{position:sticky;top:calc(env(safe-area-inset-top,0px) + 14px);z-index:5;background:var(--surface);border:2px solid var(--fg);border-radius:16px;padding:16px 18px;box-shadow:7px 7px 0 var(--lc);transition:box-shadow .2s;margin-right:12px}
+.ticket[data-l="T"]{box-shadow:4px 4px 0 var(--h),8px 8px 0 var(--s),12px 12px 0 var(--o)}
+.k{font-family:var(--mono);font-size:.75rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.route{font-family:var(--mono);font-weight:700;font-size:clamp(.95rem,2.4vw,1.15rem);line-height:1.45;margin-top:6px;overflow-wrap:anywhere}
+.route.pop{animation:pop .28s ease-out}
+@keyframes pop{from{transform:translateY(6px);opacity:.3}to{transform:none;opacity:1}}
+.dif{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;align-items:center}
+.dif button{min-height:40px;padding:6px 14px;border:2px solid var(--rule);border-radius:999px;background:var(--surface);font-size:.9rem;font-weight:700}
+.dif button[aria-pressed="true"]{border-color:var(--fg);background:var(--fg);color:var(--bg)}
+.types{display:flex;flex-wrap:wrap;gap:8px}
+.types button{display:inline-flex;align-items:center;gap:8px;min-height:46px;padding:8px 14px 8px 10px;border:2px solid var(--rule);border-radius:999px;background:var(--surface);font-size:.95rem;font-weight:700;transition:transform .12s,border-color .12s,box-shadow .12s}
+.types button em{font-style:normal;font-family:var(--mono);font-size:.78rem;min-width:26px;height:26px;display:inline-grid;place-items:center;border-radius:50%;background:var(--soft);color:var(--fg)}
+.types button:hover{transform:translateY(-2px);border-color:var(--fg);box-shadow:0 4px 0 var(--rule)}
+.types button[aria-pressed="true"]{border-color:var(--fg);background:var(--fg);color:var(--bg)}
+.types button[aria-pressed="true"] em{background:var(--sun);color:var(--on-line)}
+.detail{padding-top:18px;border-top:2px solid var(--rule);max-width:60ch}
+.map-box{min-width:0;position:sticky;top:calc(env(safe-area-inset-top,0px) + 14px)}
+.map{display:block;width:100%;max-width:450px;height:auto;margin-inline:auto;font-family:var(--body)}
+.map .trunk{fill:none;stroke:var(--fg);stroke-width:5;stroke-linecap:round}
+.map .st{fill:var(--surface);stroke:var(--fg);stroke-width:4}
+.map .st-end{fill:var(--fg);stroke:var(--fg);stroke-width:4}
+.map .lb{fill:var(--fg);font-size:14px;font-weight:700}
+.map .lb-m{fill:var(--muted);font-size:13px}
+.track .line{fill:none;stroke:var(--lc);stroke-width:5;stroke-linecap:round;stroke-linejoin:round;opacity:.42;transition:stroke-width .25s,opacity .25s}
+.track .flow{fill:none;stroke:var(--surface);stroke-width:3;stroke-linecap:round;stroke-dasharray:1 16;opacity:0}
+.track rect{fill:var(--surface);stroke:var(--lc);stroke-width:2.5}
+.track text{fill:var(--fg);font-size:12.5px;font-weight:700;text-anchor:middle}
+.track.on .line{stroke-width:12;opacity:1}
+.track.on .flow{opacity:.95;animation:flow 1s linear infinite}
+.track.on rect{fill:var(--lc)}
+.track.on text{fill:var(--on-line)}
+.track[data-l="C"].on text{fill:var(--bg)}
+.track.alt .line{opacity:.85;stroke-dasharray:1 11}
+@keyframes flow{to{stroke-dashoffset:-17}}
+.map-cap{font-size:.9rem;color:var(--muted);text-align:center;margin-top:8px;max-width:38ch;margin-inline:auto}
+.two{display:grid;gap:32px;margin-top:56px;align-items:start}
+@media (min-width:900px){.two{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:56px}}
+.two > *{min-width:0}
+.team{border-top:2px solid var(--fg);margin-top:16px}
+.team li{display:grid;grid-template-columns:7.2rem minmax(0,1fr);gap:4px 14px;padding:11px 0;border-bottom:1px solid var(--rule);align-items:baseline;font-size:.98rem}
+.team b{font-family:var(--mono);font-size:.92rem}
+.code{background:var(--band-bg);color:var(--band-fg);border-radius:16px;padding:20px;box-shadow:7px 7px 0 var(--s);margin-top:16px}
+.code pre{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;font-family:var(--mono);font-size:.84rem;line-height:1.7}
+.code pre b{color:var(--sun);font-weight:700}
+.code .copy{margin-top:14px;min-height:40px;padding:6px 16px;border:2px solid var(--band-fg);border-radius:999px;background:transparent;color:var(--band-fg);font-weight:700;font-size:.9rem}
+.code .copy:hover{background:var(--band-fg);color:var(--band-bg)}
+
+/* ---------- casos reais ---------- */
+.cases{display:grid;gap:28px;margin-top:40px}
+@media (min-width:1020px){.cases{grid-template-columns:repeat(3,minmax(0,1fr));gap:24px}}
+.case{background:var(--surface);border:2px solid var(--fg);border-radius:18px;padding:22px 20px 20px;min-width:0;display:grid;gap:18px;align-content:start}
+.case header{display:grid;gap:8px}
+.case h3{font-size:1.4rem;line-height:1.12}
+.case .when{font-family:var(--mono);font-size:.78rem;color:var(--muted)}
+.line{position:relative;display:grid;gap:18px;padding-left:30px}
+.line::before{content:"";position:absolute;left:8px;top:8px;bottom:8px;width:5px;border-radius:3px;background:var(--rule)}
+.line::after{content:"";position:absolute;left:8px;top:8px;width:5px;border-radius:3px;background:var(--fg);height:calc(var(--done,1)*(100% - 16px));transition:height .5s linear}
+.line li{position:relative;transition:opacity .3s}
+.line li::before{content:"";position:absolute;left:-30px;top:2px;width:21px;height:21px;border-radius:50%;background:var(--surface);border:4px solid var(--fg);z-index:1;transition:background .2s,transform .3s cubic-bezier(.3,1.8,.5,1)}
+.line li.lit::before{background:var(--lc,var(--fg))}
+.line li.wait{opacity:.28}
+.line li.wait::before{transform:scale(.7)}
+.line .who{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.line p{margin-top:6px;font-size:.98rem;line-height:1.5}
+.line p b{font-weight:700;white-space:nowrap;box-shadow:inset 0 -.5em 0 var(--soft)}
+.case .end{font-size:.95rem;border-top:2px solid var(--rule);padding-top:14px;color:var(--muted)}
+.case .end b{color:var(--fg)}
+
+/* ---------- voto cego ---------- */
+.duel{display:grid;gap:14px;grid-template-columns:repeat(2,minmax(0,1fr));margin-top:28px;max-width:860px}
+.duel figure{background:var(--art);border-radius:14px;border:2px solid var(--art-rule);padding:10px 10px 14px;display:grid;gap:10px;justify-items:center;transition:border-color .2s,box-shadow .2s,opacity .3s}
+.duel img{width:100%;max-width:340px}
+.duel button{min-height:46px;min-width:120px;padding:8px 18px;border-radius:999px;border:2px solid var(--art-fg);background:transparent;color:var(--art-fg);font-weight:700}
+.duel button:hover{background:var(--art-fg);color:var(--art)}
+.duel.done button{display:none}
+.duel.done figure.win{border-color:var(--sun);box-shadow:7px 7px 0 var(--sun)}
+.duel.done figure.lose{opacity:.55}
+.duel figcaption{display:none;color:var(--art-fg);font-family:var(--mono);font-size:.82rem;text-align:center}
+.duel.done figcaption{display:block}
+.reveal{margin-top:20px;max-width:860px;background:var(--fg);color:var(--bg);border-radius:16px;padding:18px 20px;box-shadow:7px 7px 0 var(--sun)}
+.reveal b{display:block;font-family:var(--display);font-weight:800;font-size:1.4rem;line-height:1.15}
+.reveal span{display:block;margin-top:6px}
+.tally{display:grid;gap:22px;margin-top:44px;padding-top:26px;border-top:2px solid var(--fg)}
+@media (min-width:900px){.tally{grid-template-columns:26fr 5fr 6fr;gap:28px}}
+.tally h3{font-size:1rem;font-family:var(--body);letter-spacing:0;display:flex;gap:10px;align-items:baseline}
+.tally h3 b{font-family:var(--display);font-weight:800;font-size:2rem;line-height:1}
+.pcs{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.pc{display:flex;gap:3px;padding:6px 7px;border-radius:8px;background:var(--surface);border:1.5px solid var(--rule)}
+.pc i{width:11px;height:11px;border-radius:50%;background:var(--muted)}
+.pc i.A{background:var(--s)} .pc i.B{background:var(--f)} .pc i.e{background:transparent;border:2px solid var(--muted)}
+.pc:hover{border-color:var(--fg)}
+.legend{display:flex;flex-wrap:wrap;gap:8px 20px;margin-top:20px;font-size:.92rem;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:7px}
+.legend i{width:11px;height:11px;border-radius:50%;background:var(--muted);display:inline-block}
+.legend i.A{background:var(--s)} .legend i.B{background:var(--f)} .legend i.e{background:transparent;border:2px solid var(--muted)}
+.proof{display:grid;gap:24px;margin-top:44px;padding-top:28px;border-top:2px solid var(--fg)}
+@media (min-width:760px){.proof{grid-template-columns:repeat(2,minmax(0,1fr));gap:48px}}
+.proof b{display:block;font-family:var(--display);font-weight:800;font-size:clamp(2rem,4.6vw,3rem);line-height:1;font-variant-numeric:tabular-nums}
+.proof p{margin-top:10px;max-width:46ch}
+
+/* ---------- custo ---------- */
+.chart{margin-top:36px}
+.chart figcaption{font-size:.95rem;color:var(--muted);max-width:62ch}
+.bars{display:grid;gap:18px;margin-top:20px}
+.bars li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 16px;align-items:baseline}
+.bars .who{font-weight:700;display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline}
+.bars .who i{width:12px;height:12px;border-radius:50%;background:var(--lc);display:inline-block;align-self:center}
+.bars .who small{font-family:var(--mono);font-size:.8rem;font-weight:400;color:var(--muted)}
+.bars .val{font-family:var(--mono);font-weight:700;font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+.bars .rail{grid-column:1/-1;height:16px;border-radius:4px;background:var(--soft)}
+.bars .rail i{display:block;height:100%;min-width:3px;width:var(--v);border-radius:4px;background:var(--lc)}
+@media (min-width:760px){
+  .bars li{grid-template-columns:300px minmax(0,1fr) 130px;align-items:center}
+  .bars .rail{grid-row:1;grid-column:2}
+  .bars .val{grid-column:3;grid-row:1}
+}
+.reread{display:grid;gap:28px;margin-top:56px;align-items:end}
+@media (min-width:900px){.reread{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:56px}}
+.turns{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:6px;align-items:end;max-width:440px}
+.turns div{display:grid;gap:4px}
+.turns i{display:block;aspect-ratio:1.5;border-radius:4px;background:repeating-linear-gradient(135deg,var(--o) 0 4px,transparent 4px 8px);border:1.5px solid var(--o)}
+.turns i.new{background:var(--sun);border-color:var(--sun)}
+.turns span{font-family:var(--mono);font-size:.72rem;color:var(--muted);text-align:center;margin-top:2px}
+.rules4{counter-reset:r;display:grid;gap:16px;margin-top:20px;max-width:66ch}
+.rules4 li{counter-increment:r;display:grid;grid-template-columns:auto minmax(0,1fr);gap:14px}
+.rules4 li::before{content:counter(r);font-family:var(--mono);font-weight:700;width:30px;height:30px;display:grid;place-items:center;border-radius:50%;background:var(--sun);color:var(--on-line);font-size:.85rem;margin-top:2px}
+.sub{margin-top:52px}
+
+/* ---------- conselho ---------- */
+.council{margin-top:36px;display:grid;gap:24px}
+@media (min-width:900px){.council{grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr);gap:48px}}
+.council > *{min-width:0}
+.q-box{background:var(--surface);border:2px solid var(--fg);border-radius:16px;padding:20px;align-self:start}
+.q-box .q{font-family:var(--display);font-weight:700;font-size:1.3rem;line-height:1.2;margin-top:6px}
+.opts{display:grid;gap:8px;margin-top:14px}
+.opts li{display:flex;gap:10px;align-items:center}
+.opts b,.vote{font-family:var(--mono);font-weight:700;width:30px;height:30px;display:inline-grid;place-items:center;border-radius:8px;background:var(--soft);flex:none}
+fieldset{border:0;padding:0;margin:20px 0 0}
+legend{padding:0}
+.modes{display:grid;gap:8px;margin-top:8px}
+.modes label{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:2px solid var(--rule);border-radius:12px;cursor:pointer;min-height:44px}
+.modes label:has(input:checked){border-color:var(--fg);background:var(--soft)}
+.modes input{width:20px;height:20px;margin:3px 0 0;accent-color:var(--o);flex:none}
+.modes small{display:block;color:var(--muted);font-size:.88rem;line-height:1.35}
+.q-box .btn{margin-top:20px;width:100%}
+.note{font-size:.88rem;color:var(--muted);margin-top:12px}
+.jurors{display:grid;gap:12px}
+.juror{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 16px;align-items:center;background:var(--surface);border:2px solid var(--rule);border-radius:14px;padding:14px 16px}
+.juror small{grid-column:1;color:var(--muted);font-size:.9rem}
+.juror .vote{grid-column:2;grid-row:1/3;width:48px;height:48px;border-radius:12px;font-size:1.4rem;color:var(--muted)}
+.juror.voted{border-color:var(--fg)}
+.juror.voted .vote{background:var(--lc);color:var(--on-line);animation:stamp .3s cubic-bezier(.3,1.6,.5,1)}
+@keyframes stamp{from{transform:scale(.4) rotate(-14deg)}to{transform:none}}
+.verdict{position:relative;margin-top:16px;border-radius:16px;padding:18px 20px;background:var(--fg);color:var(--bg);box-shadow:7px 7px 0 var(--s)}
+.verdict[data-r="divergencia"]{box-shadow:7px 7px 0 var(--f)}
+.verdict[data-r="rodando"]{box-shadow:7px 7px 0 var(--rule)}
+.verdict b{display:block;font-family:var(--display);font-weight:800;font-size:1.5rem;line-height:1.15}
+.verdict span{display:block;margin-top:6px;opacity:.9}
+.burst{position:absolute;left:36px;top:26px;width:0;height:0;pointer-events:none}
+.burst i{position:absolute;width:10px;height:10px;border-radius:50%;background:var(--c);animation:burst .7s ease-out forwards}
+@keyframes burst{from{transform:translate(0,0) scale(1);opacity:1}to{transform:translate(var(--x),var(--y)) scale(.2);opacity:0}}
+
+/* ---------- escada ---------- */
+.ladder{display:grid;gap:10px;margin-top:36px}
+.ladder li{--i:1;display:grid;grid-template-columns:auto minmax(0,1fr);gap:14px;align-items:center;margin-left:calc((var(--i) - 1) * 4.5%);background:var(--surface);border:2px solid var(--rule);border-radius:14px;padding:14px 16px;transition:transform .2s,box-shadow .2s,border-color .2s}
+.ladder li em{font-style:normal;font-family:var(--mono);font-weight:700;width:34px;height:34px;display:grid;place-items:center;border-radius:50%;background:var(--soft)}
+.ladder li small{display:block;color:var(--muted);font-size:.92rem}
+.ladder li.done{opacity:.6}
+.ladder li.done em{background:var(--fg);color:var(--bg)}
+.ladder li.now{border-color:var(--fg);box-shadow:7px 7px 0 var(--o);transform:translate(-3px,-3px)}
+.ladder li.now em{background:var(--o);color:var(--on-line)}
+@media (min-width:860px){
+  .ladder{grid-template-columns:repeat(5,minmax(0,1fr));align-items:end;gap:12px}
+  .ladder li{margin-left:0;margin-top:calc((5 - var(--i)) * 34px);grid-template-columns:minmax(0,1fr);align-content:start;min-height:calc(120px + var(--i) * 34px)}
+}
+.ladder-ctl{display:flex;flex-wrap:wrap;gap:12px 16px;align-items:center;margin-top:28px}
+.ladder-msg{flex:1 1 260px;min-width:0}
+
+/* ---------- placar ---------- */
+.lessons{display:grid;gap:16px;margin-top:36px}
+@media (min-width:700px){.lessons{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (min-width:1040px){.lessons{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.lesson{background:var(--surface);border:1.5px solid var(--rule);border-radius:16px;padding:22px;display:grid;gap:14px;align-content:start;min-width:0}
+.lesson dd{margin-top:2px}
+.lesson .was{color:var(--muted)}
+.lesson .got{font-family:var(--display);font-weight:700;font-size:1.3rem;line-height:1.2}
+.lesson .got mark{background:var(--sun);color:var(--on-line);padding:0 .25em;border-radius:6px;font-variant-numeric:tabular-nums;white-space:nowrap}
+
+/* ---------- regras, skills, fecho ---------- */
+.house{display:grid;gap:0 56px;margin-top:36px;border-top:2px solid var(--fg)}
+@media (min-width:800px){.house{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.house li{padding:22px 0;border-bottom:1px solid var(--rule)}
+.house q{display:block;quotes:none;font-family:var(--display);font-weight:700;font-size:clamp(1.3rem,2.6vw,1.6rem);line-height:1.15}
+.house p{margin-top:8px;color:var(--muted);max-width:48ch}
+.skills{display:grid;gap:0 40px;margin-top:32px;border-top:2px solid var(--fg);grid-template-columns:repeat(auto-fill,minmax(min(100%,320px),1fr))}
+.skills li{padding:13px 0;border-bottom:1px solid var(--rule);display:grid;gap:2px}
+.skills b{font-family:var(--mono);font-size:.95rem}
+.skills span{font-size:.97rem;line-height:1.45}
+.skills small{color:var(--muted);font-size:.84rem}
+.close h2{max-width:20ch}
+.cta{display:flex;flex-wrap:wrap;gap:14px;margin-top:28px}
+.credits{margin-top:40px;display:grid;gap:10px;max-width:72ch;color:var(--muted)}
+.credits a{color:var(--fg)}
+footer{border-top:1px solid var(--rule);font-size:.9rem;color:var(--muted)}
+footer .wrap{padding-block:28px 40px;display:grid;gap:8px}
+footer p{max-width:86ch}
+
+@media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+@media (forced-colors:active){.chip,.btn,.ticket,.verdict,.reveal{border:2px solid CanvasText}.bars .rail i,.day i{background:Highlight}}
+</style>
+</head>
+<body>
+<a class="skip" href="#main"><span lang="pt">Pular para o conteúdo</span><span lang="en">Skip to content</span></a>
+<div class="progress" aria-hidden="true"><i id="bar"></i></div>
+
+<header class="hero">
+  <svg class="ribbon" viewBox="0 0 420 280" aria-hidden="true" focusable="false">
+    <path d="M40 0V150A110 110 0 0 0 150 260H420" stroke="var(--h)"/>
+    <path d="M62 0V150A88 88 0 0 0 150 238H420" stroke="var(--s)"/>
+    <path d="M84 0V150A66 66 0 0 0 150 216H420" stroke="var(--o)"/>
+    <path d="M106 0V150A44 44 0 0 0 150 194H420" stroke="var(--f)"/>
+    <circle cx="40" cy="96" r="9"/><circle cx="250" cy="238" r="9"/><circle cx="330" cy="194" r="9"/>
+  </svg>
+  <div class="wrap">
+    <div class="top">
+      <b>Gabriel Munaro</b>
+      <div class="langs" role="group" aria-label="Language / Idioma">
+        <button type="button" id="lang-pt" aria-pressed="false">PT</button>
+        <button type="button" id="lang-en" aria-pressed="true">EN</button>
+      </div>
+    </div>
+    <div class="hero-grid">
+      <div>
+        <p class="eyebrow"><span lang="pt">Como eu construo software</span><span lang="en">How I build software</span></p>
+        <h1 lang="pt"><span class="hl hl-s">947 pull requests</span> mesclados em 26 dias, com um <span class="hl hl-y">enxame de agentes</span> de IA.</h1>
+        <h1 lang="en"><span class="hl hl-s">947 pull requests</span> merged in 26 days, with a <span class="hl hl-y">swarm of AI agents</span>.</h1>
+        <p class="lede" lang="pt">O projeto é o Dawnbringer, um roguelike auto-battler com alpha no Android e demos para desktop. Eu defino o objetivo e o que conta como pronto. Um agente condutor divide o trabalho, modelos mais baratos executam em paralelo e um comando decide se cada resultado entra. Esta página mostra o fluxo, três execuções reais dele e as medições por trás de cada regra.</p>
+        <p class="lede" lang="en">The project is Dawnbringer, a roguelike auto-battler with an Android alpha and desktop demos. I set the goal and what counts as done. A conductor agent splits the work, cheaper models do it in parallel, and a command decides whether each result is accepted. This page shows the workflow, three real runs of it, and the measurements behind each rule.</p>
+      </div>
+      <figure class="shot">
+        <img src="img/battle.png" width="1280" height="720" alt="" id="shot-img">
+        <figcaption><span lang="pt">Dawnbringer, tela de batalha. Godot 4.5.</span><span lang="en">Dawnbringer, battle screen. Godot 4.5.</span></figcaption>
+      </figure>
+    </div>
+
+    <div class="prs">
+      <div class="prs-head">
+        <h2><span lang="pt">Pull requests mesclados por dia</span><span lang="en">Pull requests merged per day</span></h2>
+        <p class="cap"><span lang="pt">gmunaro/dawnbringer, 19 out a 13 nov de 2026. API do GitHub, medido em 13 nov.</span><span lang="en">gmunaro/dawnbringer, Oct 19 to Nov 13, 2026. GitHub API, measured Nov 13.</span></p>
+      </div>
+      <div class="days" id="days" role="img"></div>
+      <div class="axis" id="axis" aria-hidden="true"></div>
+      <ul class="stats">
+        <li class="stat"><b>947</b><span lang="pt">PRs mesclados, do primeiro em 19 de outubro até 13 de novembro</span><span lang="en">PRs merged, from the first on October 19 to November 13</span></li>
+        <li class="stat"><b>92</b><span lang="pt">no dia mais cheio, 24 de outubro</span><span lang="en">on the busiest day, October 24</span></li>
+        <li class="stat"><b><span lang="pt">3.103</span><span lang="en">3,103</span></b><span lang="pt">execuções de subagentes medidas antes de eu escrever o roteador</span><span lang="en">subagent runs measured before I wrote the router</span></li>
+        <li class="stat"><b>72%</b><span lang="pt">do custo de 30 dias vinha da conversa principal, não dos subagentes</span><span lang="en">of 30 days of cost came from the main conversation, not the subagents</span></li>
+      </ul>
+    </div>
+  </div>
+</header>
+
+<section class="art" aria-labelledby="h-art">
+  <h2 class="sr" id="h-art"><span lang="pt">Personagens do jogo feitos pelo fluxo</span><span lang="en">Game characters made by the workflow</span></h2>
+  <div class="gallery" tabindex="0" id="gallery">
+    <figure><img src="img/c-threshold.webp" width="358" height="549" alt="" loading="lazy"><figcaption>The Iron Threshold</figcaption></figure>
+    <figure><img src="img/c-crow.webp" width="427" height="466" alt="" loading="lazy"><figcaption>Crow Cultist</figcaption></figure>
+    <figure><img src="img/c-claw.webp" width="462" height="438" alt="" loading="lazy"><figcaption>The Lesser Claw</figcaption></figure>
+    <figure><img src="img/c-golem.webp" width="363" height="434" alt="" loading="lazy"><figcaption>Slag Golem</figcaption></figure>
+    <figure><img src="img/c-scarecrow.webp" width="328" height="488" alt="" loading="lazy"><figcaption>Scarecrow</figcaption></figure>
+    <figure><img src="img/c-revenant.webp" width="234" height="542" alt="" loading="lazy"><figcaption>Hanged Revenant</figcaption></figure>
+    <figure><img src="img/c-cinderling.webp" width="476" height="540" alt="" loading="lazy"><figcaption>Cinderling</figcaption></figure>
+    <figure><img src="img/c-ashplough.webp" width="618" height="376" alt="" loading="lazy"><figcaption>The Ashplough</figcaption></figure>
+  </div>
+  <div class="wrap art-note">
+    <p lang="pt">Oito das peças em SVG do jogo. Um agente Fable desenha cada uma a partir de uma peça base e um script confere o encaixe no esqueleto de animação. Um lote de <b>79 peças</b> teve <b>73 aceitas</b> e custou <b>US$ 710</b>, medidos. Depois, cada tentativa de melhoria enfrentou a versão anterior em voto cego.</p>
+    <p lang="en">Eight of the game's SVG pieces. A Fable agent draws each one from a base piece and a script checks that it fits the animation rig. One batch of <b>79 pieces</b> had <b>73 accepted</b> and cost <b>US$ 710</b>, measured. After that, every attempt to improve a piece faced the previous version in a blind vote.</p>
+  </div>
+</section>
+
+<main id="main">
+
+<section class="sec" id="router" aria-labelledby="h-router">
+  <div class="wrap">
+    <span class="tag">skill enxame · swarm</span>
+    <h2 id="h-router"><span lang="pt">Cada tarefa vai para o modelo mais barato que dá conta</span><span lang="en">Each task goes to the cheapest model that can do it</span></h2>
+    <p class="intro" lang="pt">Antes de delegar, o condutor classifica a tarefa em um de 18 tipos e escreve uma linha com quem vai fazer, em qual modelo, com que esforço e por qual método. Ele não pede confirmação. Escolha um tipo e veja a linha.</p>
+    <p class="intro" lang="en">Before delegating, the conductor classifies the task into one of 18 types and writes one line saying who does it, on which model, at what effort and by which method. It does not ask for confirmation. Pick a type and see the line.</p>
+
+    <div class="router">
+      <div class="router-main">
+        <div class="ticket" id="ticket" data-l="S">
+          <p class="k"><span lang="pt">O condutor escreve</span><span lang="en">The conductor writes</span></p>
+          <p class="route" id="route"></p>
+          <div class="dif" id="dif" role="group" aria-label="Difficulty / Dificuldade"></div>
+        </div>
+        <div class="types" id="types" role="group" aria-label="Task type / Tipo de tarefa"></div>
+        <p class="detail" id="det"></p>
+        <p class="sr" role="status" id="route-live"></p>
+      </div>
+      <div class="map-box">
+        <svg class="map" id="map" viewBox="0 0 400 462" role="img" aria-labelledby="map-d">
+          <desc id="map-d">A task enters the router, travels one of five lines (conductor, Haiku, Sonnet, Opus or Fable), passes the oracle and reaches done. The highlighted line is the one for the selected task type.</desc>
+          <path class="trunk" d="M200 22V96"/><path class="trunk" d="M200 370V440"/>
+          <g class="track" data-l="C"><path class="line" d="M200 96L40 166V300L200 370"/><rect x="4" y="219" width="72" height="28" rx="14"/><text x="40" y="237.5" id="t-cond">Conductor</text></g>
+          <g class="track" data-l="H"><path class="line" d="M200 96L120 166V300L200 370"/><rect x="84" y="219" width="72" height="28" rx="14"/><text x="120" y="237.5">Haiku</text></g>
+          <g class="track" data-l="S"><path class="line" d="M200 96V370"/><rect x="164" y="219" width="72" height="28" rx="14"/><text x="200" y="237.5">Sonnet</text></g>
+          <g class="track" data-l="O"><path class="line" d="M200 96L280 166V300L200 370"/><rect x="244" y="219" width="72" height="28" rx="14"/><text x="280" y="237.5">Opus</text></g>
+          <g class="track" data-l="F"><path class="line" d="M200 96L360 166V300L200 370"/><rect x="324" y="219" width="72" height="28" rx="14"/><text x="360" y="237.5">Fable</text></g>
+          <circle class="st" cx="200" cy="22" r="8"/><circle class="st" cx="200" cy="60" r="11"/><circle class="st" cx="200" cy="400" r="11"/><circle class="st-end" cx="200" cy="440" r="8"/>
+          <text class="lb" x="220" y="27" id="t-task">Task</text>
+          <text class="lb" x="220" y="65" id="t-router">Router</text>
+          <text class="lb-m" x="180" y="64" text-anchor="end" id="t-types">18 types</text>
+          <text class="lb" x="220" y="405" id="t-oracle">Oracle</text>
+          <text class="lb-m" x="180" y="404" text-anchor="end" id="t-fail">failed? climb the ladder</text>
+          <text class="lb" x="220" y="445" id="t-done">Done</text>
+        </svg>
+        <p class="map-cap" lang="pt">Oráculo é o comando cujo resultado decide: um teste, o typecheck, um benchmark.</p>
+        <p class="map-cap" lang="en">The oracle is the command whose result decides: a test, the typecheck, a benchmark.</p>
+      </div>
+    </div>
+
+    <div class="two">
+      <div>
+        <h3><span lang="pt">Um condutor e seis operários</span><span lang="en">One conductor and six workers</span></h3>
+        <ul class="team">
+          <li><b>conductor</b><span lang="pt">Decide, integra e confere. Fica no mesmo modelo até o fim da tarefa.</span><span lang="en">Decides, integrates and checks. Stays on one model until the task ends.</span></li>
+          <li><b>scout</b><span lang="pt">Haiku. Varre o código e responde com arquivo e linha. Só lê.</span><span lang="en">Haiku. Sweeps the code and answers with file and line. Read-only.</span></li>
+          <li><b>researcher</b><span lang="pt">Haiku. Docs, changelogs e transcrições, com as fontes.</span><span lang="en">Haiku. Docs, changelogs and transcripts, with sources.</span></li>
+          <li><b>auditor</b><span lang="pt">Haiku. Roda os checks e reporta com a saída. Nunca corrige.</span><span lang="en">Haiku. Runs the checks and reports with the output. Never fixes.</span></li>
+          <li><b>implementer</b><span lang="pt">Haiku a Opus, pela dificuldade. Worktree própria, arquivos só dele.</span><span lang="en">Haiku to Opus, by difficulty. Its own worktree and its own files.</span></li>
+          <li><b>reviewer</b><span lang="pt">Sonnet ou Opus. Sempre um revisor novo, sem a conversa do autor.</span><span lang="en">Sonnet or Opus. Always a fresh reviewer, without the author's conversation.</span></li>
+          <li><b>svg-artist</b><span lang="pt">Fable. Todo SVG. Parte de uma base e não julga o próprio trabalho.</span><span lang="en">Fable. Every SVG. Starts from a base and never judges its own work.</span></li>
+        </ul>
+      </div>
+      <div>
+        <h3><span lang="pt">O subagente não vê a conversa</span><span lang="en">A subagent cannot see the conversation</span></h3>
+        <p class="note" style="font-size:1rem;margin-top:10px" lang="pt">Todo prompt de delegação segue o mesmo esqueleto de seis linhas.</p>
+        <p class="note" style="font-size:1rem;margin-top:10px" lang="en">Every delegation prompt follows the same six-line skeleton.</p>
+        <div class="code">
+          <pre id="skeleton" tabindex="0" lang="pt"><b>Objetivo:</b> &lt;uma frase&gt;.
+<b>Contexto:</b> &lt;só o que ele não acha sozinho&gt;.
+<b>Pode ler:</b> &lt;...&gt;. <b>Pode editar:</b> &lt;arquivos, ou "nada"&gt;.
+<b>Pronto quando:</b> &lt;comando ou observação&gt;.
+<b>Responda em:</b> &lt;formato&gt;, até &lt;N&gt; palavras. Cada afirmação com arquivo:linha, URL lida ou saída de comando.
+<b>Abordagem:</b> &lt;ângulo desta variante&gt;.</pre>
+          <pre id="skeleton-en" tabindex="0" lang="en"><b>Goal:</b> &lt;one sentence&gt;.
+<b>Context:</b> &lt;only what it cannot find alone&gt;.
+<b>May read:</b> &lt;...&gt;. <b>May edit:</b> &lt;files, or "nothing"&gt;.
+<b>Done when:</b> &lt;command or observation&gt;.
+<b>Answer in:</b> &lt;format&gt;, up to &lt;N&gt; words. Every claim with file:line, a URL you read, or command output.
+<b>Approach:</b> &lt;this variant's angle&gt;.</pre>
+          <button type="button" class="copy" id="copy"></button>
+          <span class="sr" role="status" id="copy-live"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="runs" aria-labelledby="h-runs">
+  <div class="wrap">
+    <span class="tag">placar.md · scoreboard</span>
+    <h2 id="h-runs"><span lang="pt">Três execuções reais, passo a passo</span><span lang="en">Three real runs, step by step</span></h2>
+    <p class="intro" lang="pt">Cada passo abaixo é uma linha do placar do projeto, com o modelo que rodou e o que ele devolveu. A cor da estação é a do modelo.</p>
+    <p class="intro" lang="en">Each step below is a line from the project scoreboard, with the model that ran and what it returned. The station color is the model's.</p>
+    <p style="margin-top:20px"><button type="button" class="btn sm" id="replay"></button></p>
+
+    <div class="cases">
+      <article class="case">
+        <header>
+          <p class="when">2026-11-10 → 11-11</p>
+          <h3><span lang="pt">PvP online, de quatro arquiteturas a um servidor revisado</span><span lang="en">Online PvP, from four architectures to a reviewed server</span></h3>
+        </header>
+        <ol class="line">
+          <li data-l="H"><div class="who"><span class="chip ol">/premortem</span><span class="chip" data-l="H">5 × Haiku</span></div>
+            <p lang="pt"><b>30 causas</b> de falha, unidas em 14. Sete viraram critério de aceite. Uma lente achou o limite de 500 MB por banco D1.</p>
+            <p lang="en"><b>30 failure causes</b>, merged into 14. Seven became acceptance criteria. One lens found the 500 MB limit per D1 database.</p></li>
+          <li data-l="T"><div class="who"><span class="chip ol">/conselho</span><span class="chip c"><span lang="pt">11 votos</span><span lang="en">11 votes</span></span></div>
+            <p lang="pt">Arquitetura B, por <b>11 a 0</b>.</p>
+            <p lang="en">Architecture B, <b>11 to 0</b>.</p></li>
+          <li data-l="O"><div class="who"><span class="chip ol">/advogado</span><span class="chip" data-l="O">Opus</span><span class="chip" data-l="H">5 × Haiku</span></div>
+            <p lang="pt">Atacou a opção B. Achou que o rival online aceitava atributos sem teto e que semente mais ações não reproduzia a partida.</p>
+            <p lang="en">Attacked option B. Found that the online rival accepted stats with no cap and that seed plus actions did not reproduce a run.</p></li>
+          <li data-l="O"><div class="who"><span class="chip ol">/advogado</span><span class="chip" data-l="O">Opus</span><span class="chip c"><span lang="pt">desenho do servidor</span><span lang="en">server design</span></span></div>
+            <p lang="pt">Duas rodadas, <b>2 bloqueadores</b>. A deduplicação por log podia ser burlada e os apagamentos não chegavam aos rankings.</p>
+            <p lang="en">Two rounds, <b>2 blockers</b>. Dedupe by log could be bypassed and deletions never reached the rankings.</p></li>
+          <li data-l="O"><div class="who"><span class="chip ol">implementer</span><span class="chip" data-l="O">Opus high</span></div>
+            <p lang="pt">Servidor Worker + D1 em <b>26 minutos</b>. 118 testes, 3 mutações provadas.</p>
+            <p lang="en">Worker + D1 server in <b>26 minutes</b>. 118 tests, 3 mutations proven.</p></li>
+          <li data-l="O"><div class="who"><span class="chip ol">/revisor-cego</span><span class="chip" data-l="O">Opus</span></div>
+            <p lang="pt">Duas rodadas. Aprovou com 1 achado alto, corrigido. O revisor escreveu as próprias sondas e 8 mutações a mais.</p>
+            <p lang="en">Two rounds. Approved with 1 high finding, fixed. The reviewer wrote its own probes and 8 extra mutations.</p></li>
+        </ol>
+        <p class="end" lang="pt"><b>Resultado:</b> o servidor passou na revisão. Os 2 bloqueadores apareceram no desenho, antes de existir código.</p>
+        <p class="end" lang="en"><b>Result:</b> the server passed review. Both blockers surfaced in the design, before any code existed.</p>
+      </article>
+
+      <article class="case">
+        <header>
+          <p class="when">2026-11-09 · PR #1263</p>
+          <h3><span lang="pt">Uma correção que ninguém aceitou de primeira</span><span lang="en">A bug fix nobody accepted on sight</span></h3>
+        </header>
+        <ol class="line">
+          <li data-l="O"><div class="who"><span class="chip ol">/advogado</span><span class="chip" data-l="O">Opus high</span></div>
+            <p lang="pt">Atacou o primeiro desenho da correção. As objeções viraram uma segunda opção, a B.</p>
+            <p lang="en">Attacked the first design of the fix. Its objections became a second option, B.</p></li>
+          <li data-l="T"><div class="who"><span class="chip ol">/conselho</span><span class="chip c"><span lang="pt">10 votos</span><span lang="en">10 votes</span></span></div>
+            <p lang="pt">Onde a regra deve morar no código? B, por <b>10 a 0</b>.</p>
+            <p lang="en">Where should the rule live in the code? B, <b>10 to 0</b>.</p></li>
+          <li data-l="T"><div class="who"><span class="chip ol">/conselho</span><span class="chip c"><span lang="pt">11 votos</span><span lang="en">11 votes</span></span></div>
+            <p lang="pt">Um caso de borda da mesma correção. B, por <b>10 a 1</b>.</p>
+            <p lang="en">An edge case of the same fix. B, <b>10 to 1</b>.</p></li>
+          <li data-l="O"><div class="who"><span class="chip ol">/revisor-cego</span><span class="chip" data-l="O">Opus high</span><span class="chip c">r1</span></div>
+            <p lang="pt"><b>7 achados</b> em telas e textos.</p>
+            <p lang="en"><b>7 findings</b> in screens and copy.</p></li>
+          <li data-l="O"><div class="who"><span class="chip ol">/revisor-cego</span><span class="chip" data-l="O">Opus high</span><span class="chip c">r2</span></div>
+            <p lang="pt">Um revisor novo achou um teste afetado que estava fora do diff.</p>
+            <p lang="en">A fresh reviewer found an affected test that was outside the diff.</p></li>
+          <li data-l="O"><div class="who"><span class="chip ol">/revisor-cego</span><span class="chip" data-l="O">Opus high</span><span class="chip c">r3</span></div>
+            <p lang="pt">Aprovado.</p>
+            <p lang="en">Approved.</p></li>
+        </ol>
+        <p class="end" lang="pt"><b>Resultado:</b> aprovado na terceira rodada. Cada rodada de revisão usa um revisor que não viu a anterior.</p>
+        <p class="end" lang="en"><b>Result:</b> approved on the third round. Each review round uses a reviewer that never saw the previous one.</p>
+      </article>
+
+      <article class="case">
+        <header>
+          <p class="when">2026-10-21</p>
+          <h3><span lang="pt">63 textos em 13 idiomas, em menos de 2 minutos cada</span><span lang="en">63 strings into 13 languages, under 2 minutes each</span></h3>
+        </header>
+        <ol class="line">
+          <li data-l="C"><div class="who"><span class="chip c"><span lang="pt">condutor</span><span lang="en">conductor</span></span></div>
+            <p lang="pt">Divide o trabalho em um operário por idioma. Cada um recebe só os textos, a referência do idioma e o glossário.</p>
+            <p lang="en">Splits the work into one worker per language. Each gets only the strings, that language's reference and the glossary.</p></li>
+          <li data-l="H"><div class="who"><span class="chip ol">implementer</span><span class="chip" data-l="H">13 × Haiku high</span></div>
+            <p lang="pt"><b>13 de 13</b> terminaram, entre 1 e 1,6 minuto cada.</p>
+            <p lang="en"><b>13 of 13</b> finished, in 1 to 1.6 minutes each.</p></li>
+          <li data-l="C"><div class="who"><span class="chip ol"><span lang="pt">oráculo</span><span lang="en">oracle</span></span><span class="chip c">script</span></div>
+            <p lang="pt">O script de validação rejeitou <b>0</b> entradas.</p>
+            <p lang="en">The validation script rejected <b>0</b> entries.</p></li>
+          <li data-l="C"><div class="who"><span class="chip c"><span lang="pt">condutor</span><span lang="en">conductor</span></span><span class="chip ol"><span lang="pt">revisão</span><span lang="en">review</span></span></div>
+            <p lang="pt">Achou o que o script não vê: termos diferentes dos do jogo, gênero do jogador num nome de conquista e uma palavra repetida com dois sentidos em francês.</p>
+            <p lang="en">Found what the script cannot see: terms that drifted from the game's, player gender in an achievement name, and one French word used with two meanings.</p></li>
+        </ol>
+        <p class="end" lang="pt"><b>Resultado:</b> zero rejeições no script e, ainda assim, três tipos de erro que só a revisão pegou.</p>
+        <p class="end" lang="en"><b>Result:</b> zero rejections from the script, and still three kinds of error that only the review caught.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="vote" aria-labelledby="h-vote">
+  <div class="wrap">
+    <span class="tag">skill curadoria · curation</span>
+    <h2 id="h-vote"><span lang="pt">Arte entra por voto cego. Vote você também.</span><span lang="en">Art ships by blind vote. Cast yours.</span></h2>
+    <p class="intro" lang="pt">Estas são duas versões do mesmo chefe, The Lesser Claw. Uma é a que estava no jogo e a outra é a tentativa nova do agente. Os jurados não sabem qual é qual. Qual das duas deveria ficar?</p>
+    <p class="intro" lang="en">These are two versions of the same boss, The Lesser Claw. One was already in the game and the other is the agent's new attempt. The jurors do not know which is which. Which one should stay?</p>
+
+    <div class="duel" id="duel">
+      <figure id="fig-x"><img src="img/vote-x.webp" width="462" height="438" alt="" id="img-x" loading="lazy"><button type="button" id="vote-x">X</button><figcaption><span lang="pt">X · versão anterior</span><span lang="en">X · previous version</span></figcaption></figure>
+      <figure id="fig-y"><img src="img/vote-y.webp" width="462" height="438" alt="" id="img-y" loading="lazy"><button type="button" id="vote-y">Y</button><figcaption><span lang="pt">Y · versão nova</span><span lang="en">Y · new version</span></figcaption></figure>
+    </div>
+    <div class="reveal" id="reveal" role="status" hidden></div>
+
+    <div class="tally">
+      <div><h3><b>26</b><span lang="pt">vezes a versão nova A venceu</span><span lang="en">times new version A won</span></h3><div class="pcs" id="pc-A"></div></div>
+      <div><h3><b>5</b><span lang="pt">a nova B venceu</span><span lang="en">new version B won</span></h3><div class="pcs" id="pc-B"></div></div>
+      <div><h3><b>6</b><span lang="pt">a anterior ficou</span><span lang="en">the previous one stayed</span></h3><div class="pcs" id="pc-0"></div></div>
+    </div>
+    <p class="legend" aria-hidden="true">
+      <span><i class="A"></i><span lang="pt">voto na nova A</span><span lang="en">vote for new A</span></span>
+      <span><i class="B"></i><span lang="pt">voto na nova B</span><span lang="en">vote for new B</span></span>
+      <span><i></i><span lang="pt">voto na anterior</span><span lang="en">vote for the previous</span></span>
+      <span><i class="e"></i><span lang="pt">empate</span><span lang="en">tie</span></span>
+    </p>
+    <p class="intro" lang="pt">Cada bloco é uma das 37 peças de uma rodada, com os votos dos três jurados. A versão nova precisa de 2 votos. Empate ou votos espalhados deixam a anterior no jogo.</p>
+    <p class="intro" lang="en">Each block is one of the 37 pieces in one round, with the three jurors' votes. A new version needs 2 votes. A tie or a split vote leaves the previous one in the game.</p>
+
+    <div class="proof">
+      <div><b><span lang="pt">5,7 a 6,1</span><span lang="en">5.7 to 6.1</span></b>
+        <p lang="pt">foi a faixa das notas de 1 a 10 que o júri deu a três versões de um corpo. O voto cego ordenou as mesmas três por 8 a 1 e 9 a 0. Por isso nota não decide.</p>
+        <p lang="en">was the range of the 1 to 10 scores a jury gave three versions of one body. The blind vote ordered the same three 8 to 1 and 9 to 0. So scores do not decide.</p></div>
+      <div><b>4 / 3 / 2 / 0</b>
+        <p lang="pt">foi o voto com quatro folhas parecidas na mesma rodada. Com só duas delas frente a frente, deu 9 a 0. Hoje todo aceite é um confronto de duas versões.</p>
+        <p lang="en">was the vote with four similar sheets in one round. With only two of them head to head it was 9 to 0. Every acceptance is now a two-version match.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="sec band" id="cost" aria-labelledby="h-cost">
+  <div class="wrap">
+    <span class="tag">hook telemetria.mjs</span>
+    <h2 id="h-cost"><span lang="pt">Agente longo custa mais que modelo caro</span><span lang="en">A long run costs more than an expensive model</span></h2>
+    <p class="intro" lang="pt">Cada turno de um agente relê o contexto inteiro, então o que pesa na conta é o tempo de execução. Nos dias 9 e 10 de novembro, um Sonnet que rodou 100 minutos custou mais que um Opus que rodou 26.</p>
+    <p class="intro" lang="en">Every turn of an agent re-reads its whole context, so what drives the bill is how long it runs. On November 9 and 10, a Sonnet that ran 100 minutes cost more than an Opus that ran 26.</p>
+
+    <figure class="chart">
+      <figcaption><span lang="pt">Custo por subagente em dólares, a preço equivalente de API. Telemetria de 9 e 10 de novembro de 2026.</span><span lang="en">Cost per subagent in US dollars, at API-equivalent prices. Telemetry from November 9 and 10, 2026.</span></figcaption>
+      <ul class="bars">
+        <li data-l="H"><span class="who"><i></i>Haiku<small><span lang="pt">qualquer esforço</span><span lang="en">any effort</span></small></span><span class="val"><span lang="pt">0,02 a 0,06</span><span lang="en">0.02 to 0.06</span></span><span class="rail"><i style="--v:.39%"></i></span></li>
+        <li data-l="O"><span class="who"><i></i>Opus high<small>26 min · n=49</small></span><span class="val"><span lang="pt">3,45</span><span lang="en">3.45</span></span><span class="rail"><i style="--v:22.4%"></i></span></li>
+        <li data-l="S"><span class="who"><i></i>Sonnet high<small>100 min · n=45</small></span><span class="val"><span lang="pt">3,99</span><span lang="en">3.99</span></span><span class="rail"><i style="--v:25.9%"></i></span></li>
+        <li data-l="F"><span class="who"><i></i>Fable high<small>64 min · n=10</small></span><span class="val"><span lang="pt">15,41</span><span lang="en">15.41</span></span><span class="rail"><i style="--v:100%"></i></span></li>
+      </ul>
+    </figure>
+
+    <div class="reread">
+      <figure>
+        <div class="turns" id="turns" role="img"></div>
+        <figcaption class="cap" style="margin-top:12px;max-width:52ch"><span lang="pt">Esquema, não medição. O bloco amarelo é o que o turno escreve e os hachurados são o que ele relê. Com turnos de tamanho igual, 8 turnos releem 28 blocos e 16 turnos releem 120.</span><span lang="en">A schematic, not a measurement. The yellow block is what a turn writes and the hatched ones are what it re-reads. With equal-sized turns, 8 turns re-read 28 blocks and 16 turns re-read 120.</span></figcaption>
+      </figure>
+      <div>
+        <h3><span lang="pt">As quatro regras que saíram dessa conta</span><span lang="en">The four rules this produced</span></h3>
+        <ol class="rules4">
+          <li><span lang="pt">Modelo caro recebe escopo curto, com os fatos já reunidos por um Haiku e um teto de turnos.</span><span lang="en">An expensive model gets a short scope, with the facts already gathered by a Haiku and a cap on turns.</span></li>
+          <li><span lang="pt">Leitura longa fica com o Haiku. Passou de uns 3 arquivos, o condutor delega a leitura.</span><span lang="en">Long reading goes to Haiku. Past about 3 files, the conductor delegates the reading.</span></li>
+          <li><span lang="pt">O condutor não troca de modelo no meio da tarefa, porque a troca invalida o cache.</span><span lang="en">The conductor never switches model mid-task, because switching invalidates the cache.</span></li>
+          <li><span lang="pt">Todo lançamento leva modelo e esforço explícitos. Subagente sem modelo herda o mais caro da sessão, e isso era 22% do custo.</span><span lang="en">Every launch names its model and effort. A subagent without a model inherits the session's most expensive one, and that was 22% of the cost.</span></li>
+        </ol>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="council" aria-labelledby="h-council">
+  <div class="wrap">
+    <span class="tag">skill conselho · council</span>
+    <h2 id="h-council"><span lang="pt">Quando nenhum teste decide, três modelos votam</span><span lang="en">When no test can decide, three models vote</span></h2>
+    <p class="intro" lang="pt">Entre 2 e 4 opções e sem comando que decida, o condutor não escolhe sozinho e não me pergunta. Ele monta um pacote com a pergunta, as opções e a evidência, e manda para um Opus, um Sonnet e um Haiku. Cada um vota isolado e recebe as opções numa ordem diferente.</p>
+    <p class="intro" lang="en">With 2 to 4 options and no command that can decide, the conductor neither picks alone nor asks me. It builds a packet with the question, the options and the evidence, and sends it to an Opus, a Sonnet and a Haiku. Each votes in isolation and sees the options in a different order.</p>
+
+    <div class="council">
+      <div class="q-box">
+        <p class="k"><span lang="pt">Pergunta de exemplo</span><span lang="en">Sample question</span></p>
+        <p class="q"><span lang="pt">Onde rasterizar o SVG do jogo?</span><span lang="en">Where should the game rasterize its SVG?</span></p>
+        <ul class="opts">
+          <li><b>A</b><span lang="pt">Em runtime</span><span lang="en">At runtime</span></li>
+          <li><b>B</b><span lang="pt">No build</span><span lang="en">At build time</span></li>
+          <li><b>C</b><span lang="pt">Híbrido</span><span lang="en">Hybrid</span></li>
+        </ul>
+        <fieldset>
+          <legend class="k"><span lang="pt">Modo</span><span lang="en">Mode</span></legend>
+          <div class="modes">
+            <label><input type="radio" name="modo" id="modo-rapido" checked><span><span lang="pt">Rápido</span><span lang="en">Quick</span><small lang="pt">Fácil de desfazer. 3 a 0 ou 2 a 1 decide.</small><small lang="en">Easy to undo. 3 to 0 or 2 to 1 decides.</small></span></label>
+            <label><input type="radio" name="modo" id="modo-completo"><span><span lang="pt">Completo</span><span lang="en">Full</span><small lang="pt">Caro de desfazer. Só 3 a 0 decide. Com 2 a 1 entram mais dois votos e a opção precisa de 4.</small><small lang="en">Expensive to undo. Only 3 to 0 decides. On 2 to 1, two more votes come in and the option needs 4.</small></span></label>
+          </div>
+        </fieldset>
+        <button type="button" class="btn" id="run"></button>
+        <p class="note" lang="pt">Simulação. Os votos são sorteados para mostrar as regras de contagem.</p>
+        <p class="note" lang="en">A simulation. Votes are drawn at random to show the counting rules.</p>
+      </div>
+      <div>
+        <ol class="jurors" id="jurors"></ol>
+        <div class="verdict" id="verdict" role="status" data-r="decisao"></div>
+      </div>
+    </div>
+
+    <div class="proof">
+      <div><b>38 / 43</b>
+        <p lang="pt">conselhos rápidos fecharam em decisão. Dos 5 que não fecharam, 2 tinham uma premissa falsa no pacote e 2 terminaram em divergência, que é quando a pergunta volta para mim.</p>
+        <p lang="en">quick councils ended in a decision. Of the 5 that did not, 2 had a false premise in the packet and 2 ended in divergence, which is when the question comes back to me.</p></div>
+      <div><b>78 / 78</b>
+        <p lang="pt">decisões do conselho antigo, que somava modelos gratuitos e pesos por modelo, deram o mesmo resultado que a maioria simples dos votos Claude. Cortei para o trio.</p>
+        <p lang="en">decisions of the old council, which added free models and per-model weights, matched the plain majority of the Claude votes. I cut it down to the trio.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="ladder-sec" aria-labelledby="h-ladder">
+  <div class="wrap">
+    <span class="tag">skill enxame · escada</span>
+    <h2 id="h-ladder"><span lang="pt">Quando um operário falha, a ordem é fixa</span><span lang="en">When a worker fails, the order is fixed</span></h2>
+    <p class="intro" lang="pt">Falhar é errar, travar ou dizer "pronto" sem a evidência pedida. A primeira correção é sempre a mais barata. Trocar de modelo só vem no quarto degrau.</p>
+    <p class="intro" lang="en">Failing means getting it wrong, stalling, or saying "done" without the evidence asked for. The first fix is always the cheapest one. Changing model only comes on the fourth step.</p>
+    <ol class="ladder" id="ladder">
+      <li style="--i:1"><em>1</em><span><strong lang="pt">Corrigir o prompt</strong><strong lang="en">Fix the prompt</strong><small lang="pt">e relançar o mesmo operário</small><small lang="en">and relaunch the same worker</small></span></li>
+      <li style="--i:2"><em>2</em><span><strong lang="pt">Subir o esforço</strong><strong lang="en">Raise the effort</strong><small lang="pt">Haiku medium vira Haiku high</small><small lang="en">Haiku medium becomes Haiku high</small></span></li>
+      <li style="--i:3"><em>3</em><span><strong lang="pt">Dividir a subtarefa</strong><strong lang="en">Split the subtask</strong><small lang="pt">partes de 3 a 5 itens</small><small lang="en">parts of 3 to 5 items</small></span></li>
+      <li style="--i:4"><em>4</em><span><strong lang="pt">Subir de modelo</strong><strong lang="en">Raise the model</strong><small>Haiku, Sonnet, Opus, Fable</small></span></li>
+      <li style="--i:5"><em>5</em><span><strong lang="pt">O condutor faz direto</strong><strong lang="en">The conductor does it</strong><small lang="pt">com o contexto que já tem</small><small lang="en">with the context it already has</small></span></li>
+    </ol>
+    <div class="ladder-ctl">
+      <button type="button" class="btn" id="fail"></button>
+      <button type="button" class="btn ghost" id="reset"></button>
+      <p class="ladder-msg" role="status" id="ladder-msg"></p>
+    </div>
+  </div>
+</section>
+
+<section class="sec band" id="scoreboard" aria-labelledby="h-score">
+  <div class="wrap">
+    <span class="tag">placar.md · scoreboard</span>
+    <h2 id="h-score"><span lang="pt">O que o placar me fez mudar</span><span lang="en">What the scoreboard made me change</span></h2>
+    <p class="intro" lang="pt">Cada A/B, escalada, conselho e revisão vira uma linha no placar, com o resultado e o motivo. Um padrão que aparece em duas linhas ou mais vira lição. Estas cinco mudaram o fluxo.</p>
+    <p class="intro" lang="en">Every A/B test, escalation, council and review becomes a line in the scoreboard, with the outcome and the reason. A pattern seen in two or more lines becomes a lesson. These five changed the workflow.</p>
+    <div class="lessons">
+      <dl class="lesson">
+        <div><dt class="k"><span lang="pt">Eu fazia</span><span lang="en">I used to</span></dt><dd class="was"><span lang="pt">Refinava um texto por rodadas até a nota média do júri chegar a 9.</span><span lang="en">Refine a text round after round until the jury's mean score reached 9.</span></dd></div>
+        <div><dt class="k"><span lang="pt">O placar mostrou</span><span lang="en">The scoreboard showed</span></dt><dd class="got"><span lang="pt"><mark>0 de 7</mark> chegaram a 9. O ganho vem na primeira rodada.</span><span lang="en"><mark>0 of 7</mark> reached 9. The gain comes in the first round.</span></dd></div>
+        <div><dt class="k"><span lang="pt">Hoje</span><span lang="en">Now</span></dt><dd><span lang="pt">A versão nova enfrenta a anterior em voto cego. O teto é de 3 rodadas.</span><span lang="en">The new version faces the previous one in a blind vote. The cap is 3 rounds.</span></dd></div>
+      </dl>
+      <dl class="lesson">
+        <div><dt class="k"><span lang="pt">Eu fazia</span><span lang="en">I used to</span></dt><dd class="was"><span lang="pt">Aceitava um teste novo verde como prova da correção.</span><span lang="en">Accept a new green test as proof of the fix.</span></dd></div>
+        <div><dt class="k"><span lang="pt">O placar mostrou</span><span lang="en">The scoreboard showed</span></dt><dd class="got"><span lang="pt"><mark>3 vezes</mark> o teste novo passava com ou sem a correção.</span><span lang="en"><mark>3 times</mark> the new test passed with or without the fix.</span></dd></div>
+        <div><dt class="k"><span lang="pt">Hoje</span><span lang="en">Now</span></dt><dd><span lang="pt">Prova por mutação. O agente desfaz a correção, vê o teste falhar, restaura e mostra as duas saídas.</span><span lang="en">Proof by mutation. The agent undoes the fix, watches the test fail, restores it and shows both outputs.</span></dd></div>
+      </dl>
+      <dl class="lesson">
+        <div><dt class="k"><span lang="pt">Eu fazia</span><span lang="en">I used to</span></dt><dd class="was"><span lang="pt">Entregava um documento de 300 linhas a um único Haiku.</span><span lang="en">Hand a 300-line document to a single Haiku.</span></dd></div>
+        <div><dt class="k"><span lang="pt">O placar mostrou</span><span lang="en">The scoreboard showed</span></dt><dd class="got"><span lang="pt">Ele voltou com <mark>1 de 16</mark> seções.</span><span lang="en">It came back with <mark>1 of 16</mark> sections.</span></dd></div>
+        <div><dt class="k"><span lang="pt">Hoje</span><span lang="en">Now</span></dt><dd><span lang="pt">Partes de 3 a 5 itens, com teto de chamadas. O Haiku grava o resultado aos poucos.</span><span lang="en">Parts of 3 to 5 items, with a cap on calls. The Haiku writes its result as it goes.</span></dd></div>
+      </dl>
+      <dl class="lesson">
+        <div><dt class="k"><span lang="pt">Eu fazia</span><span lang="en">I used to</span></dt><dd class="was"><span lang="pt">Testei o Haiku no esforço máximo e os chefes em SVG no esforço xhigh.</span><span lang="en">Try Haiku at max effort and the SVG bosses at xhigh effort.</span></dd></div>
+        <div><dt class="k"><span lang="pt">O placar mostrou</span><span lang="en">The scoreboard showed</span></dt><dd class="got"><span lang="pt">O Haiku gastou <mark>3 vezes</mark> a saída. Cada chefe custou de 7 a 12 dólares em vez de 6, sem diferença visível.</span><span lang="en">Haiku spent <mark>3 times</mark> the output. Each boss cost 7 to 12 dollars instead of 6, with no visible difference.</span></dd></div>
+        <div><dt class="k"><span lang="pt">Hoje</span><span lang="en">Now</span></dt><dd><span lang="pt">Esforço max só com pedido meu, e xhigh só com ganho medido.</span><span lang="en">Max effort only when I ask for it, and xhigh only with a measured gain.</span></dd></div>
+      </dl>
+      <dl class="lesson">
+        <div><dt class="k"><span lang="pt">Eu fazia</span><span lang="en">I used to</span></dt><dd class="was"><span lang="pt">Confiava num conselho unânime sem conferir o pacote.</span><span lang="en">Trust a unanimous council without checking its packet.</span></dd></div>
+        <div><dt class="k"><span lang="pt">O placar mostrou</span><span lang="en">The scoreboard showed</span></dt><dd class="got"><span lang="pt">Um conselho de <mark>6 a 0</mark> não viu um bloqueador que o advogado achou.</span><span lang="en">A <mark>6 to 0</mark> council missed a blocker the devil's advocate found.</span></dd></div>
+        <div><dt class="k"><span lang="pt">Hoje</span><span lang="en">Now</span></dt><dd><span lang="pt">O jurado julga o pacote, então toda decisão cara passa pelo advogado depois do voto.</span><span lang="en">A juror judges the packet, so every expensive decision goes to the advocate after the vote.</span></dd></div>
+      </dl>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="rules" aria-labelledby="h-rules">
+  <div class="wrap">
+    <span class="tag">CLAUDE.md</span>
+    <h2 id="h-rules"><span lang="pt">As regras que todo agente lê primeiro</span><span lang="en">The rules every agent reads first</span></h2>
+    <p class="intro" lang="pt">São 53 linhas de instruções globais. Estas oito explicam a maior parte do comportamento do fluxo.</p>
+    <p class="intro" lang="en">There are 53 lines of global instructions. These eight explain most of how the workflow behaves.</p>
+    <ul class="house">
+      <li><q lang="pt">Dê o problema, não a solução.</q><q lang="en">Give the problem, not the solution.</q><p lang="pt">Se o agente enxergar um jeito bem mais simples, ele para e me diz antes de seguir o plano.</p><p lang="en">If the agent sees a much simpler way, it stops and tells me before following the plan.</p></li>
+      <li><q lang="pt">Defina o pronto antes de começar.</q><q lang="en">Define done before starting.</q><p lang="pt">O pronto é o do pedido inteiro. O agente não termina oferecendo opções.</p><p lang="en">Done means done for the whole request. The agent never ends by offering options.</p></li>
+      <li><q lang="pt">Quase todo o valor está na verificação.</q><q lang="en">Almost all the value is in verification.</q><p lang="pt">Ninguém declara pronto sem ter rodado algo que prove.</p><p lang="en">Nobody declares done without running something that proves it.</p></li>
+      <li><q lang="pt">Afirme só o que mediu.</q><q lang="en">Claim only what you measured.</q><p lang="pt">Desempenho, custo e "ficou melhor" vêm com o número ou com o comando que mostra.</p><p lang="en">Performance, cost and "it got better" come with the number or the command that shows it.</p></li>
+      <li><q lang="pt">Perguntas são somente leitura.</q><q lang="en">Questions are read-only.</q><p lang="pt">Se eu perguntei, o agente responde e não edita nada.</p><p lang="en">If I asked, the agent answers and edits nothing.</p></li>
+      <li><q lang="pt">Uma tarefa por sessão.</q><q lang="en">One task per session.</q><p lang="pt">Sessão longa foi o maior custo que medi.</p><p lang="en">Long sessions were the biggest cost I measured.</p></li>
+      <li><q lang="pt">Tudo que vai volta.</q><q lang="en">Everything that goes out comes back.</q><p lang="pt">Toda frente de trabalho termina avisando quem a lançou, com o que entregou e o que foi verificado.</p><p lang="en">Every workstream ends by notifying whoever launched it, with what it delivered and what was verified.</p></li>
+      <li><q lang="pt">Regra nova diz o que mede.</q><q lang="en">A new rule says what it measures.</q><p lang="pt">Regra que não mostrar ganho em pelo menos 5 casos no placar sai do arquivo.</p><p lang="en">A rule that shows no gain across at least 5 scoreboard cases is removed.</p></li>
+    </ul>
+  </div>
+</section>
+
+<section class="sec" id="skills" aria-labelledby="h-skills">
+  <div class="wrap">
+    <span class="tag">~/.claude/skills</span>
+    <h2 id="h-skills"><span lang="pt">As 20 skills e os 3 hooks</span><span lang="en">The 20 skills and 3 hooks</span></h2>
+    <p class="intro" lang="pt">Uma skill é um conjunto de instruções que o agente carrega quando a tarefa pede. Treze são minhas. Sete vêm de Matt Pocock e Lauren Tan, sob licença MIT.</p>
+    <p class="intro" lang="en">A skill is a set of instructions the agent loads when the task calls for it. Thirteen are mine. Seven come from Matt Pocock and Lauren Tan, under the MIT license.</p>
+    <ul class="skills" id="skill-list"></ul>
+  </div>
+</section>
+
+<section class="sec close" id="source" aria-labelledby="h-source">
+  <div class="wrap">
+    <span class="tag"><span lang="pt">código aberto</span><span lang="en">open source</span></span>
+    <h2 id="h-source"><span lang="pt">As skills estão no GitHub. Fale comigo.</span><span lang="en">The skills are on GitHub. Talk to me.</span></h2>
+    <p class="intro" lang="pt">O repositório público traz o roteador, o conselho, os agentes, o hook de telemetria e o placar com as linhas brutas, em inglês. Escreva para mim sobre orquestração de agentes, avaliação de modelos ou custo de LLM.</p>
+    <p class="intro" lang="en">The public repository has the router, the council, the agents, the telemetry hook and the scoreboard with its raw lines. Write to me about agent orchestration, evals or LLM cost.</p>
+    <div class="cta">
+      <a class="btn" href="https://github.com/gmunaro/claude-skills" rel="noopener">gmunaro/claude-skills</a>
+      <a class="btn ghost" href="https://www.linkedin.com/in/gabriel-munaro/" rel="noopener">LinkedIn</a>
+      <a class="btn ghost" href="https://github.com/gmunaro" rel="noopener">GitHub</a>
+    </div>
+    <ul class="credits">
+      <li lang="pt">O ponto de partida foi a metodologia do Theo (t3.gg). Em 10 de outubro de 2026, 13 agentes Haiku leram 25 vídeos e mais de 20 repositórios dele antes de eu escrever a primeira regra.</li>
+      <li lang="en">The starting point was Theo's method (t3.gg). On October 10, 2026, 13 Haiku agents read 25 of his videos and more than 20 of his repositories before I wrote the first rule.</li>
+      <li lang="pt">Trabalho no <a href="https://t3.codes" rel="noopener">T3 Code</a>, com Claude Code, em Windows 11.</li>
+      <li lang="en">I work in <a href="https://t3.codes" rel="noopener">T3 Code</a>, with Claude Code, on Windows 11.</li>
+    </ul>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p lang="pt">Fontes: API do GitHub (PRs), hook de telemetria (custos, a preço equivalente de API) e placar da skill enxame, até 13 de novembro de 2026. As contagens pequenas, com n de 2 a 13, são registros do meu uso e não um estudo. No caso do PvP, as rodadas do advogado estão resumidas em menos passos do que o placar registra.</p>
+    <p lang="en">Sources: GitHub API (PRs), the telemetry hook (costs, at API-equivalent prices) and the swarm skill's scoreboard, up to November 13, 2026. Small counts, with n from 2 to 13, are records of my own use and not a study. In the PvP run, the advocate rounds are summarized in fewer steps than the scoreboard records.</p>
+    <p lang="pt">Página escrita com Claude Code (Fable 5.2) a partir dos repositórios, do placar e das folhas do júri.</p>
+    <p lang="en">Page written with Claude Code (Fable 5.2) from the repositories, the scoreboard and the jury sheets.</p>
+  </div>
+</footer>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const root = document.documentElement;
+  const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let lang = root.dataset.lang === 'pt' ? 'pt' : 'en';
+  const L = (pt, en) => lang === 'pt' ? pt : en;
+  const renders = [];
+
+  /* idioma */
+  function setLang(l, save){
+    lang = l; root.dataset.lang = l; root.lang = l === 'pt' ? 'pt-BR' : 'en';
+    $('lang-pt').setAttribute('aria-pressed', l === 'pt'); $('lang-en').setAttribute('aria-pressed', l === 'en');
+    document.title = L('Gabriel Munaro · Como eu construo', 'Gabriel Munaro · How I build');
+    if (save) try { localStorage.setItem('lang', l); } catch (e) {}
+    renders.forEach(f => f());
+  }
+  $('lang-pt').addEventListener('click', () => setLang('pt', true));
+  $('lang-en').addEventListener('click', () => setLang('en', true));
+
+  /* barra de progresso */
+  const bar = $('bar');
+  const prog = () => { const max = root.scrollHeight - innerHeight; bar.style.setProperty('--p', max > 0 ? Math.min(1, scrollY / max) : 0); };
+  addEventListener('scroll', prog, {passive:true}); addEventListener('resize', prog); prog();
+
+  /* PRs por dia (API do GitHub, dias em UTC-3) */
+  const PR = [['10-19',42],['10-20',55],['10-21',81],['10-22',17],['10-23',2],['10-24',92],['10-25',67],['10-26',60],['10-27',70],['10-28',31],['10-29',20],['10-30',14],['10-31',40],['11-01',43],['11-02',34],['11-03',42],['11-04',31],['11-05',13],['11-06',0],['11-07',15],['11-08',45],['11-09',55],['11-10',31],['11-11',27],['11-12',15],['11-13',5]];
+  const MES = {pt:{'10':'out','11':'nov'}, en:{'10':'Oct','11':'Nov'}};
+  const dia = d => { const [m, n] = d.split('-'); return lang === 'pt' ? `${+n} ${MES.pt[m]}` : `${MES.en[m]} ${+n}`; };
+  renders.push(() => {
+    const box = $('days'); box.innerHTML = '';
+    box.setAttribute('aria-label', L('Gráfico de barras: 947 PRs mesclados em 26 dias, com pico de 92 em 24 de outubro e nenhum em 6 de novembro.', 'Bar chart: 947 PRs merged over 26 days, peaking at 92 on October 24, with none on November 6.'));
+    PR.forEach(([d, n], k) => {
+      const el = document.createElement('div');
+      el.className = 'day' + (n === 92 ? ' peak' : '') + (n === 0 ? ' zero' : '');
+      el.style.setProperty('--v', n / 92); el.style.setProperty('--k', k);
+      el.innerHTML = `<i></i>${n === 92 ? '<b>92</b>' : ''}<u>${dia(d)} · ${n}</u>`;
+      box.appendChild(el);
+    });
+    const pos = i => ((i + .5) / PR.length * 100) + '%';
+    $('axis').innerHTML = `<span style="left:0">${dia('10-19')}</span><span style="left:${pos(13)}">${dia('11-01')}</span><span class="end" style="left:100%">${dia('11-13')}</span>` +
+      `<span class="rel" style="left:${pos(2)}">v0.5.0</span><span class="rel" style="left:${pos(20)}">v0.7.2</span>`;
+  });
+
+  /* galeria: textos alternativos */
+  renders.push(() => {
+    $('shot-img').alt = L('Captura do jogo: um herói em pixel art enfrenta dois inimigos numa fundição, com barras de vida e uma fila de itens.', 'Game screenshot: a pixel-art hero fights two enemies in a foundry, with health bars and a row of items.');
+    document.querySelectorAll('#gallery img').forEach(im => { im.alt = L('Ilustração em SVG do personagem ', 'SVG illustration of the character ') + im.nextElementSibling.textContent; });
+    $('gallery').setAttribute('aria-label', L('Galeria de personagens, role para o lado', 'Character gallery, scroll sideways'));
+    $('img-x').alt = L('Versão X: caranguejo de metal com rachaduras escuras.', 'Version X: a metal crab with dark cracks.');
+    $('img-y').alt = L('Versão Y: o mesmo caranguejo com rachaduras que brilham em amarelo.', 'Version Y: the same crab with cracks that glow yellow.');
+  });
+
+  /* roteador */
+  const T = [
+    [1,'Consulta pontual','Quick lookup','condutor','conductor','direto','direct','C','','Alvo conhecido, até uns 3 arquivos. Delegar custaria mais do que fazer.','Known target, up to about 3 files. Delegating would cost more than doing it.'],
+    [2,'Varredura no repo','Repo sweep','scout · haiku medium','','variante única','single run','H','','Responde "onde está X" com arquivo e linha. Se a lista decide algo, dois scouts buscam por ângulos diferentes.','Answers "where is X" with file and line. If the list decides something, two scouts search from different angles.'],
+    [3,'Pesquisa externa','External research','researcher · haiku medium','','fontes cruzadas','cross-checked sources','H','','O prompt leva a data de hoje e manda buscar antes de afirmar.','The prompt carries today\'s date and tells the agent to search before it claims anything.'],
+    [4,'Documento longo','Long document','researcher · haiku medium','','um por documento','one per document','H','','Um agente por transcrição, log ou spec. O condutor confere 3 citações na fonte.','One agent per transcript, log or spec. The conductor checks 3 quotes against the source.'],
+    [5,'Rodar checks','Run checks','auditor · haiku medium','','oráculo','oracle','H','','Typecheck, lint e testes. O auditor reporta com a saída e nunca corrige.','Typecheck, lint and tests. The auditor reports with the output and never fixes anything.'],
+    [6,'Triagem','Triage','general-purpose · haiku medium','','rubrica + amostra','rubric + sample','H','','Rotula itens por uma rubrica fechada. O condutor confere uns 10%.','Labels items against a closed rubric. The conductor checks about 10%.'],
+    [7,'Edição mecânica','Mechanical edit','implementer · haiku medium','','oráculo','oracle','H','','Rename, codemod, fixture, config. Um comando prova o resultado.','Rename, codemod, fixture, config. A command proves the result.'],
+    [8,'Implementação','Implementation','','','A/B','A/B','','','Feature pequena ou bug com reprodução. Com mais de um jeito plausível, duas variantes rodam em worktrees separadas e o teste escolhe.','A small feature or a reproducible bug. With more than one plausible approach, two variants run in separate worktrees and the test picks.'],
+    [9,'Bug difícil','Hard bug','opus high, background','','advogado','devil\'s advocate','O','F','O Opus investiga em background. Antes de editar, o advogado ataca a hipótese. Se o Opus falhar, o Fable recebe o mesmo pacote.','Opus investigates in the background. Before any edit, the devil\'s advocate attacks the hypothesis. If Opus fails, Fable gets the same packet.'],
+    [10,'Performance','Performance','opus high, background','','A/B + benchmark','A/B + benchmark','O','F','O benchmark é o oráculo. Duas variantes competem, com um limite que nenhuma pode piorar.','The benchmark is the oracle. Two variants compete under a limit neither may worsen.'],
+    [11,'Refactor amplo','Wide refactor','condutor + fatias','conductor + slices','pre-mortem','pre-mortem','C','H','O condutor planeja e integra. Cada fatia tem um dono por arquivo. O plano passa por pre-mortem antes de rodar.','The conductor plans and integrates. Each slice has one owner per file. The plan goes through a pre-mortem first.'],
+    [12,'Arquitetura','Architecture','condutor','conductor','advogado + conselho','advocate + council','C','','Decisão cara de desfazer. O advogado ataca o plano e, com opções fechadas, o conselho vota em modo completo.','Expensive to undo. The advocate attacks the plan and, with closed options, the council votes in full mode.'],
+    [13,'Revisão de diff','Diff review','reviewer · sonnet high','','revisor cego','blind review','S','O','Um revisor novo, sem a conversa do autor. Em auth, dinheiro, dados ou concorrência, sobe para Opus high.','A fresh reviewer without the author\'s conversation. For auth, money, data or concurrency it goes up to Opus high.'],
+    [14,'Texto para humanos','Text for humans','condutor','conductor','direto + unslop','direct + unslop','C','','PR, relatório, resposta. O condutor escreve e aplica as regras que tiram os vícios de texto de IA.','PRs, reports, replies. The conductor writes and applies the rules that strip AI writing habits.'],
+    [15,'Tarefa longa','Long unattended task','condutor + operários','conductor + workers','checkpoints','checkpoints','C','H','Eu saí e o trabalho passa de 30 minutos. O condutor grava o plano e um checkpoint por fase em arquivo.','I left and the work runs past 30 minutes. The conductor writes the plan and one checkpoint per phase to a file.'],
+    [16,'Decisão subjetiva','Judgment call','trio opus + sonnet + haiku','','conselho','council','HSO','','De 2 a 4 opções, sem teste que decida. Os três votam isolados, com as opções em ordem diferente.','2 to 4 options and no test that can decide. The three vote in isolation, each seeing the options in a different order.'],
+    [17,'Arte em SVG','SVG art','svg-artist · fable high','','voto cego','blind vote','F','','Parte sempre de uma base e corrige localmente. A versão nova só entra se vencer a anterior em voto cego.','Always starts from a base piece and fixes locally. A new version ships only if it beats the previous one in a blind vote.'],
+    [18,'Skills e instruções','Skills and instructions','fable high','','replay','replay','F','','A versão nova roda contra a antiga num replay barato antes da troca.','The new version runs against the old one in a cheap replay before the swap.']
+  ];
+  const DIF = [['simples','simple','implementer · haiku high','H'],['média','medium','implementer · sonnet high','S'],['difícil','hard','implementer · opus high','O']];
+  const NOMES = {C:['condutor','conductor'], H:['Haiku','Haiku'], S:['Sonnet','Sonnet'], O:['Opus','Opus'], F:['Fable','Fable']};
+  let sel = 7, dif = 1, touched = false;
+  const types = $('types'), ticket = $('ticket'), route = $('route'), difBox = $('dif');
+  const tracks = [...document.querySelectorAll('#map .track')];
+  tracks.forEach(g => { const f = g.querySelector('.line').cloneNode(false); f.setAttribute('class', 'flow'); g.insertBefore(f, g.querySelector('rect')); });
+  function router(){
+    types.innerHTML = ''; difBox.innerHTML = '';
+    T.forEach((t, i) => {
+      const b = document.createElement('button'); b.type = 'button'; b.id = 'type-' + t[0];
+      b.innerHTML = `<em>${t[0]}</em>${L(t[1], t[2])}`; b.setAttribute('aria-pressed', i === sel);
+      b.addEventListener('click', () => { sel = i; touched = true; router(); });
+      types.appendChild(b);
+    });
+    const t = T[sel], d = t[0] === 8 ? DIF[dif] : null;
+    if (d){
+      const s = document.createElement('span'); s.className = 'k'; s.textContent = L('Dificuldade', 'Difficulty'); difBox.appendChild(s);
+      DIF.forEach((x, i) => { const b = document.createElement('button'); b.type = 'button'; b.id = 'dif-' + i; b.textContent = L(x[0], x[1]); b.setAttribute('aria-pressed', i === dif); b.addEventListener('click', () => { dif = i; touched = true; router(); }); difBox.appendChild(b); });
+    }
+    difBox.hidden = !d;
+    const quem = d ? d[2] : L(t[3], t[4] || t[3]), on = d ? d[3] : t[7], alt = t[8];
+    route.textContent = `→ ${L('tipo', 'type')} ${t[0]}${d ? ', ' + L(d[0], d[1]) : ''} · ${quem} · ${L(t[5], t[6])}`;
+    $('det').textContent = L(t[9], t[10]);
+    ticket.dataset.l = on.length > 1 ? 'T' : on;
+    tracks.forEach(g => { g.classList.toggle('on', on.includes(g.dataset.l)); g.classList.toggle('alt', alt.includes(g.dataset.l)); });
+    $('t-cond').textContent = L('Condutor', 'Conductor'); $('t-task').textContent = L('Tarefa', 'Task'); $('t-router').textContent = L('Roteador', 'Router');
+    $('t-types').textContent = L('18 tipos', '18 types'); $('t-oracle').textContent = L('Oráculo', 'Oracle'); $('t-fail').textContent = L('falhou? sobe a escada', 'failed? climb the ladder'); $('t-done').textContent = L('Pronto', 'Done');
+    if (touched){
+      $('route-live').textContent = `${L('Tipo', 'Type')} ${t[0]}, ${L(t[1], t[2])}. ${quem}. ${L('Método', 'Method')}: ${L(t[5], t[6])}. ${L('Linha no mapa', 'Line on the map')}: ${[...on].map(x => L(...NOMES[x])).join(', ')}.`;
+      if (!calm){ route.classList.remove('pop'); void route.offsetWidth; route.classList.add('pop'); }
+    }
+  }
+  renders.push(router);
+
+  /* copiar esqueleto */
+  renders.push(() => { $('copy').textContent = L('Copiar esqueleto', 'Copy skeleton'); });
+  $('copy').addEventListener('click', () => {
+    const pre = $(lang === 'pt' ? 'skeleton' : 'skeleton-en');
+    const ok = () => { $('copy').textContent = L('Copiado', 'Copied'); $('copy-live').textContent = L('Esqueleto copiado.', 'Skeleton copied.'); setTimeout(() => { $('copy').textContent = L('Copiar esqueleto', 'Copy skeleton'); }, 1800); };
+    const fb = () => { const r = document.createRange(); r.selectNodeContents(pre); const s = getSelection(); s.removeAllRanges(); s.addRange(r); $('copy-live').textContent = L('Texto selecionado. Use o atalho de copiar.', 'Text selected. Use your copy shortcut.'); };
+    try { navigator.clipboard.writeText(pre.textContent).then(ok, fb); } catch (e) { fb(); }
+  });
+
+  /* casos: replay */
+  const lines = [...document.querySelectorAll('.line')];
+  let playing = false;
+  function replay(){
+    if (playing) return; playing = true; $('replay').disabled = true;
+    let rest = lines.length;
+    lines.forEach((ol, c) => {
+      const li = [...ol.children]; li.forEach(x => { x.classList.add('wait'); x.classList.remove('lit'); }); ol.style.setProperty('--done', 0);
+      li.forEach((x, i) => setTimeout(() => {
+        x.classList.remove('wait'); x.classList.add('lit'); ol.style.setProperty('--done', li.length > 1 ? i / (li.length - 1) : 1);
+        if (i === li.length - 1 && --rest === 0){ playing = false; $('replay').disabled = false; }
+      }, 500 + i * 650 + c * 180));
+    });
+  }
+  lines.forEach(ol => [...ol.children].forEach(x => x.classList.add('lit')));
+  renders.push(() => { $('replay').textContent = L('▶ Repetir as três execuções', '▶ Replay the three runs'); });
+  $('replay').addEventListener('click', replay);
+  if (!calm && 'IntersectionObserver' in window){
+    const io = new IntersectionObserver(es => { if (es.some(e => e.isIntersecting)){ io.disconnect(); replay(); } }, {threshold:.25});
+    io.observe(document.querySelector('.cases'));
+  }
+
+  /* voto cego */
+  let voted = '';
+  function reveal(){
+    if (!voted) return;
+    const hit = voted === 'y';
+    $('reveal').hidden = false;
+    $('reveal').innerHTML = `<b>${L(hit ? 'Você votou com o júri.' : 'O júri votou diferente de você.', hit ? 'You voted with the jury.' : 'The jury voted differently.')}</b><span>${L('Os três jurados escolheram Y, por 3 a 0. Y é a versão nova, com as rachaduras acesas, e entrou no jogo.', 'All three jurors chose Y, 3 to 0. Y is the new version, with the cracks lit, and it shipped.')}</span>`;
+  }
+  ['x', 'y'].forEach(v => $('vote-' + v).addEventListener('click', () => {
+    voted = v; $('duel').classList.add('done'); $('fig-y').classList.add('win'); $('fig-x').classList.add('lose'); reveal();
+  }));
+  renders.push(() => { $('vote-x').textContent = L('Voto no X', 'I vote X'); $('vote-y').textContent = L('Voto no Y', 'I vote Y'); reveal(); });
+  const V = 'A000|0BBB|AeAA|AAAA|AAAA|AeAA|BBBB|00B0|0AAA|BBBB|BBBB|BAAA|BBBB|0AAA|eee0|0AAA|AA0A|AAAA|AAAA|eee0|AAAA|eee0|AAAA|AAAA|AAAA|AAAA|AAAA|AAAA|AAAA|AAAA|AAAA|AAAA|AAAA|eeA0|AAAA|AAAA|AAAA'.split('|');
+  const VN = 'bellows_imp_a|bellows_imp_b|boss_the_ashplough|boss_the_iron_threshold|boss_the_lesser_claw|boss_the_noose_deacon|boss_the_threshold_keeper_c|boss_the_thrice_born_b|charnel_acolyte_c|cinderling_c|crow_cultist|en_npc_clerk_sallow|en_npc_sister_wren|hanged_revenant|lost_bearer_b|mimic_b|pale_pilgrim_c|scarecrow_b|slag_golem_b|silent_tidebearer|bone_rosary|butchers_hook|choirmasters_crozier|cinder_lash|emberbrand|forge_bellows|gibbet_hook|heart_of_the_pyre|matin_morningstar|oathkeepers_signet|penitents_nail|plague_doctors_lancet|pyre_liturgy|quenching_tongs|teachers_cane|thirteenth_knot|zealots_edge'.split('|');
+  V.forEach((v, i) => {
+    const el = document.createElement('span'); el.className = 'pc'; el.title = `${VN[i]}: ${[...v.slice(0, 3)].map(x => x === '0' ? 'base' : x === 'e' ? '=' : x).join(' · ')}`;
+    el.innerHTML = [...v.slice(0, 3)].map(x => `<i class="${x === '0' ? '' : x}"></i>`).join('');
+    $('pc-' + v[3]).appendChild(el);
+  });
+
+  /* esquema da releitura */
+  renders.push(() => {
+    const box = $('turns'); box.innerHTML = '';
+    box.setAttribute('aria-label', L('Esquema: oito turnos. Cada turno relê todos os blocos anteriores e escreve um novo.', 'Schematic: eight turns. Each turn re-reads every earlier block and writes one new block.'));
+    for (let k = 1; k <= 8; k++){
+      const col = document.createElement('div');
+      col.innerHTML = '<i class="new"></i>' + '<i></i>'.repeat(k - 1) + `<span>${L('t', 't')}${k}</span>`;
+      box.appendChild(col);
+    }
+  });
+
+  /* conselho */
+  const BASE = [['Opus','medium','O','A, B, C'],['Sonnet','medium','S','B, C, A'],['Haiku','medium','H','C, A, B']];
+  const EXTRA = [['Opus','high','O','B, C, A'],['Sonnet','high','S','C, A, B']];
+  const jurors = $('jurors'), verdict = $('verdict'), run = $('run');
+  let shown = [[BASE[0],'B'],[BASE[1],'B'],[BASE[2],'A']], last = ['decisao', 'B', 0], busy = false;
+  const card = (j, v) => {
+    const li = document.createElement('li'); li.className = 'juror' + (v ? ' voted' : ''); li.dataset.l = j[2];
+    li.innerHTML = `<strong>${j[0]} <span class="mono">${j[1]}</span></strong><small>${L('recebeu as opções na ordem', 'saw the options in the order')} ${j[3]}</small><span class="vote" aria-label="${v ? L('votou ', 'voted ') + v : ''}">${v || '?'}</span>`;
+    return li;
+  };
+  const MSG = {
+    0: o => [L(`Decisão: ${o}, por 2 a 1`, `Decision: ${o}, 2 to 1`), L(`O condutor segue com ${o} e mostra a razão da minoria.`, `The conductor goes with ${o} and shows the minority's reason.`)],
+    1: o => [L(`Decisão: ${o}, por 3 a 0`, `Decision: ${o}, 3 to 0`), L(`O condutor segue com ${o} e registra a contagem no placar.`, `The conductor goes with ${o} and logs the count in the scoreboard.`)],
+    2: () => [L('Divergência: 1 a 1 a 1', 'Divergence: 1 to 1 to 1'), L('A pergunta volta para mim, com o melhor argumento de cada lado.', 'The question comes back to me, with the best argument for each side.')],
+    3: o => [L(`Decisão: ${o}, com 4 de 5 votos`, `Decision: ${o}, with 4 of 5 votes`), L('Depois de uma decisão completa, o advogado ataca a opção escolhida.', 'After a full decision, the devil\'s advocate attacks the chosen option.')],
+    4: o => [L(`Divergência: ${o} ficou com 3 de 5`, `Divergence: ${o} got 3 of 5`), L('A opção precisava de 4 votos. A pergunta volta para mim, com a mais votada como recomendação.', 'The option needed 4 votes. The question comes back to me, with the top option as the recommendation.')],
+    5: () => [L('Votando...', 'Voting...'), L('Três jurados, cada um só com o pacote.', 'Three jurors, each with only the packet.')],
+    6: () => [L('2 a 1. Mais dois votos...', '2 to 1. Two more votes...'), L('No modo completo entram Opus high e Sonnet high.', 'In full mode, Opus high and Sonnet high join.')]
+  };
+  function paint(){
+    const m = MSG[last[2]](last[1]);
+    verdict.dataset.r = last[0]; verdict.innerHTML = '<b></b><span></span>'; verdict.firstChild.textContent = m[0]; verdict.lastChild.textContent = m[1];
+  }
+  renders.push(() => {
+    jurors.innerHTML = ''; shown.forEach(([j, v]) => jurors.appendChild(card(j, v)));
+    run.textContent = busy ? '...' : L('Rodar o conselho', 'Run the council'); paint();
+  });
+  function end(tipo, o, m){
+    last = [tipo, o, m]; paint(); busy = false; run.disabled = false; run.textContent = L('Rodar de novo', 'Run again');
+    if (tipo === 'decisao' && !calm){
+      const bx = document.createElement('div'); bx.className = 'burst'; bx.setAttribute('aria-hidden', 'true');
+      const cs = ['var(--h)','var(--s)','var(--o)','var(--f)','var(--sun)'];
+      for (let k = 0; k < 14; k++){ const a = Math.PI * 2 * k / 14, r = 60 + Math.random() * 50, d = document.createElement('i'); d.style.setProperty('--x', Math.cos(a) * r + 'px'); d.style.setProperty('--y', Math.sin(a) * r + 'px'); d.style.setProperty('--c', cs[k % 5]); bx.appendChild(d); }
+      verdict.appendChild(bx); setTimeout(() => bx.remove(), 800);
+    }
+  }
+  const draw = () => { const r = Math.random(); return r < .2 ? 'A' : r < .82 ? 'B' : 'C'; };
+  function cast(list, done){
+    const vs = []; let i = 0;
+    (function next(){
+      if (i >= list.length) return done(vs);
+      const v = draw(); vs.push(v); shown.push([list[i], v]); jurors.appendChild(card(list[i], v)); i++;
+      setTimeout(next, calm ? 0 : 420);
+    })();
+  }
+  run.addEventListener('click', () => {
+    const full = $('modo-completo').checked; busy = true; run.disabled = true; shown = []; jurors.innerHTML = ''; last = ['rodando', '', 5]; paint();
+    cast(BASE, v => {
+      const c = {}; v.forEach(x => c[x] = (c[x] || 0) + 1);
+      const top = Object.keys(c).sort((a, b) => c[b] - c[a])[0], n = c[top];
+      if (n === 3) return end('decisao', top, 1);
+      if (n === 1) return end('divergencia', '', 2);
+      if (!full) return end('decisao', top, 0);
+      last = ['rodando', '', 6]; paint();
+      setTimeout(() => cast(EXTRA, x => end(...(v.concat(x).filter(k => k === top).length === 4 ? ['decisao', top, 3] : ['divergencia', top, 4]))), calm ? 0 : 420);
+    });
+  });
+
+  /* escada */
+  let deg = 0; const steps = [...$('ladder').children];
+  const LM = [
+    ['Degrau 1. O condutor corrige o prompt e relança.', 'Step 1. The conductor fixes the prompt and relaunches.'],
+    ['Degrau 2. Mesmo operário, esforço maior.', 'Step 2. Same worker, more effort.'],
+    ['Degrau 3. A subtarefa vira partes menores.', 'Step 3. The subtask becomes smaller parts.'],
+    ['Degrau 4. Sobe um modelo por vez.', 'Step 4. Up one model at a time.'],
+    ['Degrau 5. Fim da escada. O condutor faz direto, com o contexto que já tem.', 'Step 5. Top of the ladder. The conductor does it, with the context it already has.']
+  ];
+  function ladder(){
+    steps.forEach((li, i) => { li.classList.toggle('now', i === deg); li.classList.toggle('done', i < deg); i === deg ? li.setAttribute('aria-current', 'step') : li.removeAttribute('aria-current'); });
+    $('ladder-msg').textContent = L(...LM[deg]); $('fail').disabled = deg === steps.length - 1;
+    $('fail').textContent = deg === 0 ? L('O operário falhou', 'The worker failed') : L('Falhou de novo', 'It failed again');
+    $('reset').textContent = L('Recomeçar', 'Start over');
+  }
+  $('fail').addEventListener('click', () => { if (deg < steps.length - 1){ deg++; ladder(); } });
+  $('reset').addEventListener('click', () => { deg = 0; ladder(); $('fail').focus(); });
+  renders.push(ladder);
+
+  /* skills */
+  const S = [
+    ['/enxame','Roteador de delegação. Escolhe modelo, esforço e método por tipo de tarefa.','Delegation router. Picks model, effort and method by task type.'],
+    ['/conselho','Um trio de modelos vota isolado quando nenhum teste decide.','A trio of models votes in isolation when no test can decide.'],
+    ['/curadoria','Júri pago para escolher e gerar imagem, áudio e vídeo.','A paid jury to pick and generate images, audio and video.'],
+    ['/advogado','Monta a tese mais forte contra um plano já escolhido.','Builds the strongest case against a plan already chosen.'],
+    ['/revisor-cego','Revisa o diff sem saber a intenção do autor.','Reviews the diff without knowing the author\'s intent.'],
+    ['/premortem','Imagina o plano falhando e lista as causas.','Imagines the plan failing and lists the causes.'],
+    ['/abrir-pr','PR conciso. Problema primeiro, correção depois, verificação no fim.','A concise PR. Problem first, then the fix, then what was verified.'],
+    ['/babysit-pr','Acompanha o PR até ficar verde e aprovado.','Follows a PR until it is green and approved.'],
+    ['/novo-projeto','Entrevista, escopo, MVP e stack de um projeto novo.','Interview, scope, MVP and stack for a new project.'],
+    ['/t3','Diz em que fase o projeto está e qual é o próximo passo.','Says which phase the project is in and what the next step is.'],
+    ['/tirar-duvida','Responde uma pergunta sem editar nada.','Answers a question without editing anything.'],
+    ['/pesquisar-videos','Pesquisa vídeos do YouTube pela transcrição, com agentes Haiku.','Researches YouTube videos from their transcripts, with Haiku agents.'],
+    ['/auditar-historico','Lê sessões antigas, acha falhas que se repetem e propõe regras.','Reads past sessions, finds recurring failures and proposes rules.'],
+    ['/grilling','Entrevista que testa um plano, pergunta por pergunta.','An interview that stress-tests a plan, question by question.','Matt Pocock'],
+    ['/grill-with-docs','A mesma entrevista, registrando decisões e glossário.','The same interview, recording decisions and a glossary.','Matt Pocock'],
+    ['/domain-modeling','Glossário e registros de decisão do domínio.','Glossary and decision records for the domain.','Matt Pocock'],
+    ['/diagnosing-bugs','Laço de diagnóstico para bug difícil e regressão de desempenho.','A diagnosis loop for hard bugs and performance regressions.','Matt Pocock'],
+    ['/writing-for-agents','Como escrever skills e instruções que outros agentes vão ler.','How to write skills and instructions other agents will read.','Matt Pocock'],
+    ['/wizard','Gera um roteiro em bash para os passos que só um humano pode fazer.','Generates a bash walkthrough for steps only a human can do.','Matt Pocock'],
+    ['/unslop','Tira os vícios de texto de IA.','Strips AI habits from writing.','Lauren Tan'],
+    ['hook telemetria','Grava modelo, esforço e tokens de cada subagente. É a fonte dos custos desta página.','Logs model, effort and tokens for every subagent. It is the source of the costs on this page.'],
+    ['hook ntfy','Avisa no celular quando um agente termina ou pede aprovação.','Notifies my phone when an agent finishes or asks for approval.'],
+    ['hook sem-parar','Barra o agente que tenta terminar com "se quiser" quando o próximo passo já está no plano.','Blocks an agent that tries to end with "if you want" when the next step is already in the plan.']
+  ];
+  renders.push(() => {
+    const ul = $('skill-list'); ul.innerHTML = '';
+    S.forEach(s => { const li = document.createElement('li'); li.innerHTML = '<b></b><span></span>' + (s[3] ? '<small></small>' : ''); li.children[0].textContent = s[0]; li.children[1].textContent = L(s[1], s[2]); if (s[3]) li.children[2].textContent = L('de ', 'by ') + s[3]; ul.appendChild(li); });
+  });
+
+  setLang(lang, false);
+})();
+</script>
+</body>
+</html>
