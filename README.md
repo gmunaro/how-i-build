@@ -1,6 +1,6 @@
 # How I build
 
-A single page that explains how I, Gabriel Munaro, build software with AI agents: the router that picks a model for each task, three real runs from the project scoreboard, the blind vote that accepts game art, and the cost measurements behind each rule.
+A single page that explains how I, Gabriel Munaro, build software with AI agents: the router that picks a model for each task, two real runs from the project scoreboard, the blind vote that accepts game art, and what the cost measurements changed.
 
 Live page: https://gmunaro.github.io/how-i-build/
 
