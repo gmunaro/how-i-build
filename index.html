@@ -92,7 +92,7 @@ h1{font-size:clamp(2.4rem,6.3vw,4.5rem);line-height:.98;font-weight:800;margin-t
 .hl-y{background-image:linear-gradient(var(--sun),var(--sun))}
 .lede{font-size:clamp(1.08rem,1.7vw,1.22rem);line-height:1.5;max-width:58ch;margin-top:24px}
 .shot{border-radius:14px;overflow:hidden;border:2px solid var(--fg);box-shadow:9px 9px 0 var(--o);background:var(--art)}
-.shot img{width:100%;image-rendering:pixelated}
+.shot img{width:100%}
 .shot figcaption,.cap{font-size:.88rem;color:var(--muted)}
 .shot figcaption{padding:10px 14px;background:var(--surface);border-top:2px solid var(--fg);color:var(--fg)}
 
@@ -125,9 +125,14 @@ h1{font-size:clamp(2.4rem,6.3vw,4.5rem);line-height:.98;font-weight:800;margin-t
 .art{background:var(--art);color:var(--art-fg)}
 .gallery{display:flex;gap:8px;overflow-x:auto;padding:28px max(16px,env(safe-area-inset-left,0px)) 8px;scrollbar-width:thin;scroll-snap-type:x proximity}
 .gallery figure{flex:none;scroll-snap-align:center;display:grid;justify-items:center;align-content:end;gap:6px;width:clamp(150px,19vw,230px)}
-.gallery img{height:clamp(170px,22vw,250px);width:auto;object-fit:contain;transition:transform .25s}
+.gallery img{height:clamp(170px,22vw,250px);width:auto;max-width:100%;object-fit:contain;transition:transform .25s}
 .gallery figure:hover img{transform:translateY(-8px) scale(1.04)}
 .gallery figcaption{font-family:var(--mono);font-size:.74rem;color:var(--art-muted);text-align:center}
+.shots{display:grid;gap:14px;padding-top:32px}
+@media (min-width:760px){.shots{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.shots figure{border-radius:12px;overflow:hidden;border:2px solid var(--art-rule);background:#000}
+.shots img{width:100%;display:block}
+.shots figcaption{font-family:var(--mono);font-size:.74rem;color:var(--art-muted);padding:8px 10px;background:var(--art)}
 .art-note{padding-block:14px 30px;color:var(--art-muted);font-size:.98rem}
 .art-note p{max-width:78ch}
 .art-note b{color:var(--art-fg)}
@@ -319,8 +324,8 @@ footer p{max-width:86ch}
         </div>
       </div>
       <figure class="shot">
-        <img src="img/battle.png" width="1280" height="720" alt="" id="shot-img">
-        <figcaption><span lang="pt">Dawnbringer, tela de batalha. Godot 4.5.</span><span lang="en">Dawnbringer, battle screen. Godot 4.5.</span></figcaption>
+        <img src="img/shot-boss.webp" width="1280" height="720" alt="" id="shot-img">
+        <figcaption><span lang="pt">Dawnbringer em desenvolvimento, 14 nov de 2026. Luta contra The Charnel Maw.</span><span lang="en">Dawnbringer in development, Nov 14, 2026. Fight against The Charnel Maw.</span></figcaption>
       </figure>
     </div>
 
@@ -342,20 +347,28 @@ footer p{max-width:86ch}
 </header>
 
 <section class="art" aria-labelledby="h-art">
-  <h2 class="sr" id="h-art"><span lang="pt">Personagens do jogo feitos pelo fluxo</span><span lang="en">Game characters made by the workflow</span></h2>
+  <h2 class="sr" id="h-art"><span lang="pt">Telas e personagens do jogo</span><span lang="en">Game screens and characters</span></h2>
+  <div class="wrap shots">
+    <figure><img src="img/shot-wood.webp" width="960" height="540" alt="" loading="lazy" id="shot-wood"><figcaption><span lang="pt">Luta em grupo na Hanging Wood</span><span lang="en">Group fight in the Hanging Wood</span></figcaption></figure>
+    <figure><img src="img/shot-landlord.webp" width="960" height="540" alt="" loading="lazy" id="shot-landlord"><figcaption><span lang="pt">The Orchard Eater vem cobrar o dízimo</span><span lang="en">The Orchard Eater comes to collect the tithe</span></figcaption></figure>
+    <figure><img src="img/shot-crucible.webp" width="960" height="540" alt="" loading="lazy" id="shot-crucible"><figcaption><span lang="pt">Luta em The Crucible</span><span lang="en">Fight in The Crucible</span></figcaption></figure>
+  </div>
   <div class="gallery" tabindex="0" id="gallery">
-    <figure><img src="img/c-threshold.webp" width="358" height="549" alt="" loading="lazy"><figcaption>The Iron Threshold</figcaption></figure>
-    <figure><img src="img/c-crow.webp" width="427" height="466" alt="" loading="lazy"><figcaption>Crow Cultist</figcaption></figure>
-    <figure><img src="img/c-claw.webp" width="462" height="438" alt="" loading="lazy"><figcaption>The Lesser Claw</figcaption></figure>
-    <figure><img src="img/c-golem.webp" width="363" height="434" alt="" loading="lazy"><figcaption>Slag Golem</figcaption></figure>
-    <figure><img src="img/c-scarecrow.webp" width="328" height="488" alt="" loading="lazy"><figcaption>Scarecrow</figcaption></figure>
-    <figure><img src="img/c-revenant.webp" width="234" height="542" alt="" loading="lazy"><figcaption>Hanged Revenant</figcaption></figure>
-    <figure><img src="img/c-cinderling.webp" width="476" height="540" alt="" loading="lazy"><figcaption>Cinderling</figcaption></figure>
-    <figure><img src="img/c-ashplough.webp" width="618" height="376" alt="" loading="lazy"><figcaption>The Ashplough</figcaption></figure>
+    <figure><img src="img/c-orchard-eater.webp" width="554" height="560" alt="" loading="lazy"><figcaption>The Orchard Eater</figcaption></figure>
+    <figure><img src="img/c-charnel-maw.webp" width="608" height="560" alt="" loading="lazy"><figcaption>The Charnel Maw</figcaption></figure>
+    <figure><img src="img/c-bellringer.webp" width="514" height="560" alt="" loading="lazy"><figcaption>The Bellringer</figcaption></figure>
+    <figure><img src="img/c-lamplure.webp" width="595" height="560" alt="" loading="lazy"><figcaption>The Lamplure</figcaption></figure>
+    <figure><img src="img/c-scalding-colossus.webp" width="564" height="560" alt="" loading="lazy"><figcaption>The Scalding Colossus</figcaption></figure>
+    <figure><img src="img/c-crowmother.webp" width="467" height="560" alt="" loading="lazy"><figcaption>The Crowmother</figcaption></figure>
+    <figure><img src="img/c-drowsing-abbess.webp" width="558" height="560" alt="" loading="lazy"><figcaption>The Drowsing Abbess</figcaption></figure>
+    <figure><img src="img/c-cinderglass.webp" width="505" height="560" alt="" loading="lazy"><figcaption>The Cinderglass</figcaption></figure>
+    <figure><img src="img/c-crucible-crab.webp" width="700" height="547" alt="" loading="lazy"><figcaption>The Crucible Crab</figcaption></figure>
+    <figure><img src="img/c-mimic.webp" width="556" height="560" alt="" loading="lazy"><figcaption>Mimic</figcaption></figure>
+    <figure><img src="img/c-tithe-taker.webp" width="482" height="560" alt="" loading="lazy"><figcaption>Pruner</figcaption></figure>
   </div>
   <div class="wrap art-note">
-    <p lang="pt">Arte do jogo em SVG, desenhada por um agente a partir de uma peça base. Uma versão nova só entra se vencer a anterior em voto cego.</p>
-    <p lang="en">The game's SVG art, drawn by an agent from a base piece. A new version ships only if it beats the previous one in a blind vote.</p>
+    <p lang="pt">Capturas da versão em desenvolvimento, em 14 de novembro de 2026. Os personagens são arte SVG, desenhada por um agente a partir de uma peça base. Uma versão nova só entra se vencer a anterior em voto cego.</p>
+    <p lang="en">Screenshots of the development build, taken on November 14, 2026. The characters are SVG art, drawn by an agent from a base piece. A new version ships only if it beats the previous one in a blind vote.</p>
   </div>
 </section>
 
@@ -606,7 +619,10 @@ footer p{max-width:86ch}
 
   /* galeria: textos alternativos */
   renders.push(() => {
-    $('shot-img').alt = L('Captura do jogo: um herói em pixel art enfrenta dois inimigos numa fundição, com barras de vida e uma fila de itens.', 'Game screenshot: a pixel-art hero fights two enemies in a foundry, with health bars and a row of items.');
+    $('shot-img').alt = L('Captura do jogo: um herói de armadura enfrenta The Charnel Maw, um verme gigante de boca aberta sobre um ninho de ossos, numa cripta alagada.', 'Game screenshot: an armored hero faces The Charnel Maw, a giant open-mouthed worm on a nest of bones, in a flooded crypt.');
+    $('shot-wood').alt = L('Captura do jogo: o herói luta contra um apicultor e um enforcado numa floresta com forcas.', 'Game screenshot: the hero fights a beekeeper and a hanged man in a forest of gallows.');
+    $('shot-landlord').alt = L('Captura do jogo: tela do chefe The Orchard Eater, um gigante com coroa de galhos, com as opções de pagar o dízimo ou lutar.', 'Game screenshot: the boss screen for The Orchard Eater, a giant with a crown of branches, with the choices to pay the tithe or fight.');
+    $('shot-crucible').alt = L('Captura do jogo: o herói encapuzado enfrenta um fundidor e um enxame de besouros numa fundição em ruínas.', 'Game screenshot: the hooded hero faces a smelter and a swarm of beetles in a ruined foundry.');
     document.querySelectorAll('#gallery img').forEach(im => { im.alt = L('Ilustração em SVG do personagem ', 'SVG illustration of the character ') + im.nextElementSibling.textContent; });
     $('gallery').setAttribute('aria-label', L('Galeria de personagens, role para o lado', 'Character gallery, scroll sideways'));
     $('img-x').alt = L('Versão X: caranguejo de metal com rachaduras escuras.', 'Version X: a metal crab with dark cracks.');

@@ -11,11 +11,11 @@ The page is in English and Brazilian Portuguese. It picks the language from the 
 - Pull request counts come from the GitHub API for `gmunaro/dawnbringer`, measured on November 13, 2026.
 - Costs come from my telemetry hook, at API-equivalent prices.
 - The runs, votes and lessons come from the scoreboard in [gmunaro/claude-skills](https://github.com/gmunaro/claude-skills).
-- The art in `img/` is from Dawnbringer, my game.
+- The art in `img/` is from Dawnbringer, my game. The screenshots were recorded on November 14, 2026 from the development branch (`master` at `f78fa3197`) with the SVG character art turned on, which is still off by default in the game.
 
 ## Files
 
 - `index.html`: the whole page, with its CSS and JavaScript inline.
-- `img/`: the game screenshot, eight SVG characters rendered to WebP, the two versions used in the blind vote, and the link preview image.
+- `img/`: four game screenshots, eleven SVG characters rendered to WebP, the two versions used in the blind vote, and the link preview image.
 
 Written with Claude Code (Fable 5.2).
